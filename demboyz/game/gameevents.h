@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-//#define WIP_GAMEEVENTS
-
 class bf_read;
 
 namespace GameEvents
@@ -43,16 +41,16 @@ namespace GameEvents
         EventValueType type;
         union
         {
-            ptrdiff_t   strOffset;
             float       flValue;
             int32_t     i32Value;
             int16_t     i16Value;
             uint8_t     u8Value;
             bool        bValue;
         };
+        std::string strValue;
     };
 
     using EventDataMap = std::map<std::string, EventData>;
-    EventDataMap ParseEventData(bf_read& bitbuf, const EventDescriptor& desc, std::vector<char>& stringMem);
-    void PrintEventData(bf_read& bitbuf, const EventDescriptor& desc);
+    EventDataMap ParseEventData(bf_read& bitbuf, const EventDescriptor& desc);
+    void PrintEvent(const char* name, EventDataMap& data);
 }

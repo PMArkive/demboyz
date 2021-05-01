@@ -26,21 +26,3 @@ public:
 private:
     FILE* m_demoFp;
 };
-
-class DemoFileWriter
-{
-public:
-    DemoFileWriter(FILE* fp);
-
-    FILE* GetFp() const;
-    bool IsOk() const;
-    void WriteDemoHeader(const demoheader_t& header);
-    void WriteRawData(const uint8_t* buffer, int32_t length);
-    void WriteSequenceInfo(int32_t seqNum1, int32_t seqNum2);
-    void WriteCmdInfo(const democmdinfo_t& info);
-    void WriteCmdHeader(unsigned char cmd, int32_t tick);
-    void WriteUserCmd(int32_t cmdNum, const uint8_t* buffer, int32_t length);
-
-private:
-    FILE* m_demoFp;
-};

@@ -10,7 +10,7 @@ class WaveFileWriter
 public:
     WaveFileWriter():
         m_file(nullptr),
-        m_DataBytes(0)
+        m_Samples(0)
     {
     }
 
@@ -25,7 +25,7 @@ public:
         assert(fp);
 
         m_file = fp;
-        m_DataBytes = 0;
+        m_Samples = 0;
 
         const uint32_t chunkSize = 0;
 
@@ -62,7 +62,7 @@ public:
             return;
         }
 
-        const uint32_t dataSize = m_DataBytes;
+        const uint32_t dataSize = m_Samples * bytesPerSample;
         const uint32_t chunkSize = dataSize + 36;
 
         fseek(fp, 4, SEEK_SET);
@@ -78,13 +78,29 @@ public:
 
     void WriteSamples(const int16_t* samples, uint32_t numSamples)
     {
-        const uint32_t bytesPerSample = 2;
+        if(!m_file)
+            return;
+
         const size_t elemsWritten = fwrite(samples, bytesPerSample, numSamples, m_file);
         assert(elemsWritten == numSamples);
-        m_DataBytes += (elemsWritten * bytesPerSample);
+        m_Samples += elemsWritten;
+    }
+
+    void PadSilence(uint32_t numSamples)
+    {
+        if(!m_file || m_Samples >= numSamples)
+            return;
+
+        const uint16_t silence[bytesPerSample] = {0};
+        const uint32_t pad = numSamples - m_Samples;
+        for(uint32_t i = 0; i < pad; i++)
+            fwrite(silence, bytesPerSample, 1, m_file);
+        m_Samples += pad;
     }
 
 private:
     FILE* m_file;
-    uint32_t m_DataBytes;
+    uint32_t m_Samples;
+
+    static const uint32_t bytesPerSample = 2;
 };

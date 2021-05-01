@@ -1,20 +1,11 @@
 
 #pragma once
 
-#include <cstddef>
+#include <stdint.h>
 
 namespace math
 {
-    static size_t log2(size_t value)
-    {
-        size_t res = 0;
-        while (value >>= 1)
-            ++res;
-        return res;
-    }
+    uint32_t log2(uint32_t value);
 
-    static size_t BitsToBytes(size_t bits)
-    {
-        return ((bits + 7) >> 3);
-    }
+    uint32_t BitsToBytes(uint32_t bits);
 }

@@ -13,7 +13,7 @@ group "external"
         includedirs
         {
             base_dir .. "include/",
-            external_dir .. "snappy-1.1.3/include/"
+            external_dir .. "snappy-1.1.9/"
         }
         files
         {

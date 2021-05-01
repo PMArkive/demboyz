@@ -14,7 +14,7 @@ namespace NetMsg
         uint32_t clientCRC;         // client.dll CRC server is using
         uint16_t maxClasses;        // max number of server classes
         uint32_t mapCRC;            // server map CRC
-        uint8_t unk1[16];
+        uint8_t mapMD5[16];
         uint8_t playerSlot;         // our client slot number
         uint8_t maxClients;         // max number of clients on server
         float tickInterval;         // server tick interval
@@ -23,7 +23,7 @@ namespace NetMsg
         char mapName[MAX_OSPATH];   // name of current map
         char skyName[MAX_OSPATH];   // name of current skybox
         char hostName[MAX_OSPATH];  // host name
-        bool unk2;
+        bool isReplay;
     };
 }
 

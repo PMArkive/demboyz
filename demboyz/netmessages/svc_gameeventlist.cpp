@@ -1,7 +1,6 @@
 
 #include "svc_gameeventlist.h"
 #include "base/bitfile.h"
-#include "base/jsonfile.h"
 #include "game/sourcecontext.h"
 #include "netcontants.h"
 #include "netmath.h"
@@ -47,84 +46,11 @@ namespace NetHandlers
             event.values.shrink_to_fit();
         }
 
-#ifdef WIP_GAMEEVENTS
         if (!context.gameEventList)
         {
             context.gameEventList = new NetMsg::SVC_GameEventList(*data);
         }
-#endif
+
         return !bitbuf.IsOverflowed();
-    }
-
-    bool SVC_GameEventList_BitWrite_Internal(BitWrite& bitbuf, const SourceGameContext& context, NetMsg::SVC_GameEventList* data)
-    {
-        bitbuf.WriteUBitLong(data->eventDescriptors.size(), MAX_EVENT_BITS);
-        bitbuf.WriteUBitLong(data->dataLengthInBits, 20);
-        assert(data->dataLengthInBits == CalculateNumDataBits(data->eventDescriptors));
-        for (EventDescriptor& event : data->eventDescriptors)
-        {
-            bitbuf.WriteUBitLong(event.id, MAX_EVENT_BITS);
-            bitbuf.WriteString(event.name);
-            for (EventValue& value : event.values)
-            {
-                bitbuf.WriteUBitLong(value.type, 3);
-                bitbuf.WriteString(value.name);
-            }
-            bitbuf.WriteUBitLong(0, 3);
-        }
-        return !bitbuf.IsOverflowed();
-    }
-
-    bool SVC_GameEventList_JsonRead_Internal(JsonRead& jsonbuf, SourceGameContext& context, NetMsg::SVC_GameEventList* data)
-    {
-        base::JsonReaderObject reader = jsonbuf.ParseObject();
-        assert(!reader.HasReadError());
-
-        base::JsonReaderArray eventDescriptors = reader.ReadArray("eventDescriptors");
-        eventDescriptors.TransformTo(data->eventDescriptors, [](base::JsonReaderObject& obj, EventDescriptor& event)
-        {
-            event.id = obj.ReadUInt32("id");
-            obj.ReadString("name", event.name, sizeof(event.name));
-            base::JsonReaderArray values = obj.ReadArray("values");
-            values.TransformTo(event.values, [](base::JsonReaderObject& obj, EventValue& value)
-            {
-                value.type = static_cast<GameEvents::EventValueType>(obj.ReadUInt32("type"));
-                obj.ReadString("name", value.name, sizeof(value.name));
-            });
-        });
-        data->dataLengthInBits = CalculateNumDataBits(data->eventDescriptors);
-        return !reader.HasReadError();
-    }
-
-    bool SVC_GameEventList_JsonWrite_Internal(JsonWrite& jsonbuf, const SourceGameContext& context, NetMsg::SVC_GameEventList* data)
-    {
-        jsonbuf.Reset();
-        jsonbuf.StartObject();
-        jsonbuf.StartArray("eventDescriptors");
-        for (const EventDescriptor& event : data->eventDescriptors)
-        {
-            jsonbuf.StartObject();
-            jsonbuf.WriteUInt32("id", event.id);
-            jsonbuf.WriteString("name", event.name);
-            jsonbuf.StartArray("values");
-            for (const EventValue& value : event.values)
-            {
-                jsonbuf.StartObject();
-                jsonbuf.WriteUInt32("type", value.type);
-                jsonbuf.WriteString("name", value.name);
-                jsonbuf.EndObject();
-            }
-            jsonbuf.EndArray();
-            jsonbuf.EndObject();
-        }
-        jsonbuf.EndArray();
-        jsonbuf.EndObject();
-        return jsonbuf.IsComplete();
-    }
-
-    void SVC_GameEventList_ToString_Internal(std::ostringstream& out, NetMsg::SVC_GameEventList* data)
-    {
-        out << "svc_GameEventList: number " << data->eventDescriptors.size()
-            << ", bytes " << math::BitsToBytes(data->dataLengthInBits);
     }
 }

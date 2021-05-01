@@ -1,27 +1,17 @@
-
-#include "../idemowriter.h"
 #include "netmessages/netmessages.h"
 
 #include "netmessages/svc_voiceinit.h"
 #include "netmessages/svc_voicedata.h"
 
-#include "celt/celt.h"
+#include <celt/celt.h>
+#include <SKP_Silk_SDK_API.h>
 
 #include <cassert>
 
-#include "wavfilewriter.h"
-
-#ifdef _WIN32
-//#define USE_VAUDIO_CELT
-#endif
-
-#define MAX_PLAYERS 33
-
-#ifdef USE_VAUDIO_CELT
-#define VC_EXTRALEAN
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
+#include "base/CRC.h"
+#include "game/logic.h"
+#include "voicedatawriter.h"
+#include <cstring>
 
 struct CeltConfig
 {
@@ -39,198 +29,141 @@ static CeltConfig sCeltConfigs[] =
     { 44100, 1024, 128 }    // vaudio_celt_high
 };
 
-#ifdef USE_VAUDIO_CELT
-
-class IVoiceCodec
+bool CeltVoiceDecoder::DoInit(CELTMode* celtMode, uint32_t frameSizeSamples, uint32_t encodedFrameSizeBytes)
 {
-protected:
-    virtual ~IVoiceCodec() {}
-
-public:
-    // Initialize the object. The uncompressed format is always 8-bit signed mono.
-    virtual bool Init( int quality ) = 0;
-
-    // Use this to delete the object.
-    virtual void Release() = 0;
-
-    // Compress the voice data.
-    // pUncompressed        -   16-bit signed mono voice data.
-    // maxCompressedBytes   -   The length of the pCompressed buffer. Don't exceed this.
-    // bFinal               -   Set to true on the last call to Compress (the user stopped talking).
-    //                          Some codecs like big block sizes and will hang onto data you give them in Compress calls.
-    //                          When you call with bFinal, the codec will give you compressed data no matter what.
-    // Return the number of bytes you filled into pCompressed.
-    virtual int Compress(const char *pUncompressed, int nSamples, char *pCompressed, int maxCompressedBytes, bool bFinal) = 0;
-
-    // Decompress voice data. pUncompressed is 16-bit signed mono.
-    virtual int Decompress(const char *pCompressed, int compressedBytes, char *pUncompressed, int maxUncompressedBytes) = 0;
-
-    // Some codecs maintain state between Compress and Decompress calls. This should clear that state.
-    virtual bool ResetState() = 0;
-};
-
-typedef void* (CreateInterfaceFn)(const char *pName, int *pReturnCode);
-static HINSTANCE celtDll;
-static CreateInterfaceFn* createInterfaceFunc;
-
-#else
-
-class CeltVoiceDecoder
-{
-public:
-    bool DoInit(CELTMode* celtMode, uint32_t frameSizeSamples, uint32_t encodedFrameSizeBytes)
+    if(m_celtDecoder)
     {
-        if(m_celtDecoder)
-        {
-            return false;
-        }
-
-        int error = CELT_OK;
-        m_celtDecoder = celt_decoder_create_custom(celtMode, sCeltChannels, &error);
-        assert(error == CELT_OK);
-        assert(m_celtDecoder);
-
-        m_frameSizeSamples = frameSizeSamples;
-        m_encodedFrameSizeBytes = encodedFrameSizeBytes;
-        return true;
+        return false;
     }
 
-    void Destroy()
-    {
-        celt_decoder_destroy(m_celtDecoder);
-        m_celtDecoder = NULL;
-    }
+    int error = CELT_OK;
+    m_celtDecoder = celt_decoder_create_custom(celtMode, sCeltChannels, &error);
+    assert(error == CELT_OK);
+    assert(m_celtDecoder);
 
-    void Reset()
-    {
-    }
-
-    int Decompress(
-        const uint8_t* compressedData,
-        int compressedBytes,
-        int16_t* uncompressedData,
-        int maxUncompressedSamples)
-    {
-        int curCompressedByte = 0;
-        int curDecompressedSample = 0;
-
-        const uint32_t encodedframeSizeBytes = m_encodedFrameSizeBytes;
-        const uint32_t frameSizeSamples = m_frameSizeSamples;
-        while(
-            ((compressedBytes - curCompressedByte) >= encodedframeSizeBytes) &&
-            ((maxUncompressedSamples - curDecompressedSample) >= frameSizeSamples))
-        {
-            DecodeFrame(&compressedData[curCompressedByte], &uncompressedData[curDecompressedSample]);
-            curCompressedByte += encodedframeSizeBytes;
-            curDecompressedSample += frameSizeSamples;
-        }
-        return curDecompressedSample;
-    }
-
-private:
-    void DecodeFrame(const uint8_t* compressedData, int16_t* uncompressedData)
-    {
-        int error = celt_decode(m_celtDecoder, compressedData, m_encodedFrameSizeBytes, uncompressedData, m_frameSizeSamples);
-        assert(error >= CELT_OK);
-    }
-
-private:
-    static const int sCeltChannels = 1;
-
-private:
-    CELTDecoder* m_celtDecoder = NULL;
-    uint32_t m_frameSizeSamples = 0;
-    uint32_t m_encodedFrameSizeBytes = 0;
-};
-
-#endif // USE_VAUDIO_CELT
-
-class VoiceDataWriter: public IDemoWriter
-{
-public:
-    VoiceDataWriter(const char* outputPath);
-
-    virtual void StartWriting(demoheader_t& header) override final;
-    virtual void EndWriting() override final;
-
-    virtual void StartCommandPacket(const CommandPacket& packet) override final;
-    virtual void EndCommandPacket(const PacketTrailingBits& trailingBits) override final;
-
-    virtual void WriteNetPacket(NetPacket& packet, SourceGameContext& context) override final;
-
-private:
-    struct PlayerVoiceState
-    {
-#ifdef USE_VAUDIO_CELT
-        IVoiceCodec* celtDecoder = nullptr;
-#else
-        CeltVoiceDecoder decoder;
-#endif
-        WaveFileWriter wavWriter;
-        int32_t lastVoiceDataTick = -1;
-    };
-
-private:
-    CELTMode* m_celtMode;
-    PlayerVoiceState m_playerVoiceStates[MAX_PLAYERS];
-
-    int32_t m_curTick;
-    const char* m_outputPath;
-
-    int16_t m_decodeBuffer[8192];
-
-    static const int sQuality = 3;
-};
-
-IDemoWriter* IDemoWriter::CreateVoiceDataWriter(const char* outputPath)
-{
-    return new VoiceDataWriter(outputPath);
+    m_frameSizeSamples = frameSizeSamples;
+    m_encodedFrameSizeBytes = encodedFrameSizeBytes;
+    return true;
 }
 
-VoiceDataWriter::VoiceDataWriter(const char* outputPath):
-    m_celtMode(nullptr),
-    m_playerVoiceStates(),
-    m_curTick(-1),
+void CeltVoiceDecoder::Destroy()
+{
+    celt_decoder_destroy(m_celtDecoder);
+    m_celtDecoder = NULL;
+}
+
+void CeltVoiceDecoder::Reset()
+{
+}
+
+int CeltVoiceDecoder::Decompress(
+    const uint8_t* compressedData,
+    uint32_t compressedBytes,
+    int16_t* uncompressedData,
+    uint32_t maxUncompressedSamples)
+{
+    uint32_t curCompressedByte = 0;
+    uint32_t curDecompressedSample = 0;
+
+    const uint32_t encodedframeSizeBytes = m_encodedFrameSizeBytes;
+    const uint32_t frameSizeSamples = m_frameSizeSamples;
+    while(
+        ((compressedBytes - curCompressedByte) >= encodedframeSizeBytes) &&
+        ((maxUncompressedSamples - curDecompressedSample) >= frameSizeSamples))
+    {
+        DecodeFrame(&compressedData[curCompressedByte], &uncompressedData[curDecompressedSample]);
+        curCompressedByte += encodedframeSizeBytes;
+        curDecompressedSample += frameSizeSamples;
+    }
+    return curDecompressedSample;
+}
+
+void CeltVoiceDecoder::DecodeFrame(const uint8_t* compressedData, int16_t* uncompressedData)
+{
+    int error = celt_decode(m_celtDecoder, compressedData, m_encodedFrameSizeBytes, uncompressedData, m_frameSizeSamples);
+    assert(error >= CELT_OK);
+}
+
+
+bool SilkVoiceDecoder::DoInit(int32_t sampleRate)
+{
+    m_Silk_DecoderControl.API_sampleRate = sampleRate;
+    if(m_Silk_DecoderState)
+    {
+        return false;
+    }
+
+    int decoderSize;
+	SKP_Silk_SDK_Get_Decoder_Size(&decoderSize);
+
+    m_Silk_DecoderState = malloc(decoderSize);
+    assert(m_Silk_DecoderState != NULL);
+
+    int retEnc = SKP_Silk_SDK_InitDecoder(m_Silk_DecoderState);
+    assert(retEnc == SKP_SILK_NO_ERROR);
+
+    return true;
+}
+
+void SilkVoiceDecoder::Destroy()
+{
+    if(m_Silk_DecoderState)
+        free(m_Silk_DecoderState);
+    m_Silk_DecoderState = NULL;
+}
+
+void SilkVoiceDecoder::Reset()
+{
+    SKP_Silk_SDK_InitDecoder(m_Silk_DecoderState);
+}
+
+int SilkVoiceDecoder::Decompress(
+    const uint8_t* compressedData,
+    uint32_t compressedBytes,
+    int16_t* uncompressedData,
+    uint32_t maxUncompressedSamples)
+{
+    short nSamplesOut = maxUncompressedSamples;
+    int decodeRes = SKP_Silk_SDK_Decode(m_Silk_DecoderState, &m_Silk_DecoderControl, 0, compressedData, compressedBytes, uncompressedData, &nSamplesOut);
+
+    if (SKP_SILK_NO_ERROR != decodeRes)
+        return 0;
+    return nSamplesOut;
+}
+
+
+VoiceDataWriter::VoiceDataWriter(SourceGameContext* context, const char* outputPath):
+    context(context),
     m_outputPath(outputPath)
 {
 }
 
-void VoiceDataWriter::StartWriting(demoheader_t& header)
+void VoiceDataWriter::Start()
 {
-#ifdef USE_VAUDIO_CELT
-    celtDll = LoadLibrary(TEXT("vaudio_celt.dll"));
-    createInterfaceFunc = (CreateInterfaceFn*)GetProcAddress(celtDll, "CreateInterface");
-#else
     int error = CELT_OK;
     const CeltConfig& config = sCeltConfigs[sQuality];
     m_celtMode = celt_mode_create(config.sampleRate, config.frameSizeSamples, &error);
     assert(error == CELT_OK);
     assert(m_celtMode);
-#endif
 }
 
-void VoiceDataWriter::EndWriting()
+void VoiceDataWriter::Finish()
 {
-    for(PlayerVoiceState& state : m_playerVoiceStates)
+    for(auto& state : m_playerVoiceStates)
     {
-#ifdef USE_VAUDIO_CELT
-        if(state.celtDecoder)
-        {
-            state.celtDecoder->Release();
-        }
-#else
-        state.decoder.Destroy();
-#endif
-        state.wavWriter.Close();
-        state.lastVoiceDataTick = -1;
+        state.second.celt_decoder.Destroy();
+        state.second.silk_decoder.Destroy();
+
+        state.second.fileWriter.PadSilence((m_curTick * state.second.sampleRate) / context->fTickRate);
+        state.second.fileWriter.Close();
+        state.second.lastVoiceDataTick = -1;
     }
-#ifndef USE_VAUDIO_CELT
+
     if(m_celtMode)
     {
         celt_mode_destroy(m_celtMode);
         m_celtMode = nullptr;
     }
-#endif
 }
 
 void VoiceDataWriter::StartCommandPacket(const CommandPacket& packet)
@@ -240,53 +173,200 @@ void VoiceDataWriter::StartCommandPacket(const CommandPacket& packet)
 
 void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
 {
+    const int tickMargin = context->fTickRate / 10.0; // 100ms
+    if (m_curTick <= tickMargin)
+        return;
+
+    for(auto& state : m_playerVoiceStates)
+    {
+        if((m_curTick - state.second.lastVoiceDataTick) > tickMargin)
+            state.second.fileWriter.PadSilence((m_curTick * state.second.sampleRate) / context->fTickRate);
+    }
 }
 
-void VoiceDataWriter::WriteNetPacket(NetPacket& packet, SourceGameContext& context)
+int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerVoiceState& state)
+{
+    int numDecompressedSamples = 0;
+    int pos = 0;
+    if(numBytes < 4+4+4+1+2)
+        return -1;
+
+    int dataLen = numBytes - 4; // skip CRC
+
+    uint32_t CRCdemo = *((uint32_t *)&bytes[dataLen]);
+    uint32_t CRCdata = CRC::Calculate(bytes, dataLen, CRC::CRC_32());
+    if(CRCdata != CRCdemo)
+        return -1;
+
+    //uint32_t iSteamAccountID = *((uint32_t *)&bytes[pos]);
+    pos += 4;
+    uint32_t iSteamCommunity = *((uint32_t *)&bytes[pos]);
+    pos += 4;
+
+    if(iSteamCommunity != 0x1100001)
+        return -1;
+
+    while (pos < dataLen)
+    {
+        uint8_t payloadType = bytes[pos];
+        pos++;
+
+        switch(payloadType)
+        {
+            case 11: // Sample Rate
+            {
+                if(pos + 2 > dataLen)
+                    return numDecompressedSamples;
+                short rate = *((int16_t *)&bytes[pos]);
+                pos += 2;
+                state.silk_decoder.DoInit(rate);
+                state.sampleRate = rate;
+            } break;
+            case 10: // Unknown / Unused
+            {
+                if(pos + 2 > dataLen)
+                    return numDecompressedSamples;
+                //short unk = *((int16_t *)&bytes[pos]);
+                pos += 2;
+            } break;
+            case 1: // Unknown Codec???
+            case 2: // Speex Data (Unsupported)
+            case 3: // Uncompressed Data
+            case 4: // SILK Data
+            {
+                if(pos + 2 > dataLen)
+                    return numDecompressedSamples;
+                short length = *((int16_t *)&bytes[pos]);
+                pos += 2;
+
+                if(pos + length > dataLen)
+                    return numDecompressedSamples;
+
+                if(payloadType == 3)
+                {
+                    memcpy(&m_decodeBuffer[numDecompressedSamples], &bytes[pos], length);
+                    numDecompressedSamples += length / sizeof(int16_t);
+                }
+                else if(payloadType == 4)
+                {
+                    int tpos = pos;
+                    int maxpos = tpos + length;
+                    while(tpos <= (maxpos - 2))
+                    {
+                        short chunkLength = *((int16_t *)&bytes[tpos]);
+                        tpos += 2;
+
+                        if(chunkLength == -1)
+                        {
+                            state.silk_decoder.Reset();
+                            continue;
+                        }
+                        else if(chunkLength == 0)
+                        {
+                            // DTX (discontinued transmission)
+                            int numEmptySamples = state.sampleRate / 50;
+                            memset(&m_decodeBuffer[numDecompressedSamples], 0, numEmptySamples * sizeof(int16_t));
+                            numDecompressedSamples += numEmptySamples;
+                            continue;
+                        }
+
+                        if(tpos + chunkLength > maxpos)
+                            return numDecompressedSamples;
+
+                        int ret = state.silk_decoder.Decompress(&bytes[tpos], chunkLength, &m_decodeBuffer[numDecompressedSamples],
+                            (sizeof(m_decodeBuffer) / sizeof(int16_t)) - numDecompressedSamples);
+                        numDecompressedSamples += ret;
+                        tpos += chunkLength;
+                    }
+                }
+                pos += length;
+
+            } break;
+            case 0: // Silence
+            {
+                if(pos + 2 > dataLen)
+                    return numDecompressedSamples;
+                short numSamples = *((int16_t *)&bytes[pos]);
+                memset(&m_decodeBuffer[numDecompressedSamples], 0, numSamples * sizeof(int16_t));
+                numDecompressedSamples += numSamples;
+                pos += 2;
+            } break;
+        }
+    }
+
+    return numDecompressedSamples;
+}
+
+void VoiceDataWriter::OnNetPacket(NetPacket& packet)
 {
     if(packet.type == NetMsg::svc_VoiceInit)
     {
         NetMsg::SVC_VoiceInit* voiceInit = static_cast<NetMsg::SVC_VoiceInit*>(packet.data);
-        assert(!strcmp(voiceInit->voiceCodec, "vaudio_celt"));
-        assert(voiceInit->quality == NetMsg::SVC_VoiceInit::QUALITY_HAS_SAMPLE_RATE);
-        assert(voiceInit->sampleRate == sCeltConfigs[sQuality].sampleRate);
+        if(!strcmp(voiceInit->voiceCodec, "vaudio_celt"))
+        {
+            assert(voiceInit->quality == NetMsg::SVC_VoiceInit::QUALITY_HAS_SAMPLE_RATE);
+            assert(voiceInit->sampleRate == sCeltConfigs[sQuality].sampleRate);
+            m_Codec = CODEC_CELT;
+        }
+        else if(!strcmp(voiceInit->voiceCodec, "vaudio_speex"))
+        {
+            m_Codec = CODEC_SPEEX;
+        }
+        else //if(!strcmp(voiceInit->voiceCodec, "steam"))
+        {
+            m_Codec = CODEC_STEAM;
+        }
+        context->logic->OnVoiceCodec(voiceInit->voiceCodec, voiceInit->quality, voiceInit->sampleRate);
     }
     else if(packet.type == NetMsg::svc_VoiceData)
     {
         NetMsg::SVC_VoiceData* voiceData = static_cast<NetMsg::SVC_VoiceData*>(packet.data);
         assert(voiceData->fromClientIndex < MAX_PLAYERS);
+        const char* guid = context->players[voiceData->fromClientIndex].info.guid;
 
-        PlayerVoiceState& state = m_playerVoiceStates[voiceData->fromClientIndex];
-
-        const CeltConfig& config = sCeltConfigs[sQuality];
-#ifdef USE_VAUDIO_CELT
-        const bool initWavWriter = !state.celtDecoder;
-        if(!state.celtDecoder)
-        {
-            int ret = 0;
-            state.celtDecoder = static_cast<IVoiceCodec*>(createInterfaceFunc("vaudio_celt", &ret));
-            state.celtDecoder->Init(sQuality);
-        }
-#else
-        const bool initWavWriter = state.decoder.DoInit(m_celtMode, config.frameSizeSamples, config.encodedFrameSizeBytes);
-#endif
-        if(initWavWriter)
-        {
-            std::string name = std::string(m_outputPath) + "/client_" + std::to_string((uint32_t)voiceData->fromClientIndex) + ".wav";
-            state.wavWriter.Init(name.c_str(), config.sampleRate);
-            assert(state.lastVoiceDataTick == -1);
-            state.lastVoiceDataTick = m_curTick;
-        }
-
+        uint8_t* bytes = voiceData->data.get();
         assert((voiceData->dataLengthInBits % 8) == 0);
         const int numBytes = voiceData->dataLengthInBits / 8;
 
-#ifdef USE_VAUDIO_CELT
-        const int numDecompressedSamples = state.celtDecoder->Decompress((const char*)voiceData->data.get(), numBytes, (char*)m_decodeBuffer, 8192*2);
-#else
-        const int numDecompressedSamples = state.decoder.Decompress(voiceData->data.get(), numBytes, m_decodeBuffer, 8192);
-#endif
-        state.wavWriter.WriteSamples(m_decodeBuffer, numDecompressedSamples);
+        int numDecompressedSamples = 0;
+
+        PlayerVoiceState& state = m_playerVoiceStates[guid];
+
+        if(m_Codec == CODEC_CELT)
+        {
+            const CeltConfig& config = sCeltConfigs[sQuality];
+            state.sampleRate = config.sampleRate;
+
+            state.celt_decoder.DoInit(m_celtMode, config.frameSizeSamples, config.encodedFrameSizeBytes);
+            numDecompressedSamples = state.celt_decoder.Decompress(bytes, numBytes, m_decodeBuffer, sizeof(m_decodeBuffer));
+        }
+        else
+        {
+            // Try Steam Voice
+            if(numBytes >= 15)
+            {
+                numDecompressedSamples = ParseSteamVoicePacket(bytes, numBytes, state);
+            }
+
+            // Would try speex here, if I cared...
+            if(numDecompressedSamples <= 0)
+            {
+            }
+        }
+
+        if(numDecompressedSamples <= 0)
+            return;
+
+        if(state.lastVoiceDataTick == -1)
+        {
+            std::string name = std::string(m_outputPath) + "/" + std::string(guid) + ".opus";
+            state.fileWriter.Init(name.c_str(), state.sampleRate);
+            state.fileWriter.PadSilence((m_curTick * state.sampleRate) / context->fTickRate);
+        }
+
+        state.fileWriter.WriteSamples(m_decodeBuffer, numDecompressedSamples);
+
+        context->logic->OnClientVoiceChat(voiceData->fromClientIndex, (float)numDecompressedSamples / (float)state.sampleRate);
 
         state.lastVoiceDataTick = m_curTick;
     }

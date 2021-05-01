@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/usr/include/opus",
+                "${workspaceFolder}/external/sourcesdk/include",
+                "${workspaceFolder}/external/celt-e18de77/include",
+                "${workspaceFolder}/external/SILK_SDK_SRC_FLP_v1.0.9/interface",
+                "${workspaceFolder}/external/snappy-1.1.9",
+                "${workspaceFolder}/demboyz"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "intelliSenseMode": "linux-clang-x64"
+        }
+    ],
+    "version": 4
+}

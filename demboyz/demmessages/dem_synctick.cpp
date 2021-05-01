@@ -7,19 +7,4 @@ namespace DemHandlers
     {
         return true;
     }
-
-    bool Dem_SyncTick_FileWrite_Internal(FileWrite& demofile, DemMsg::Dem_SyncTick* data)
-    {
-        return true;
-    }
-
-    bool Dem_SyncTick_JsonRead_Internal(JsonRead& jsonbuf, DemMsg::Dem_SyncTick* data)
-    {
-        return true;
-    }
-
-    bool Dem_SyncTick_JsonWrite_Internal(JsonWrite& jsonbuf, DemMsg::Dem_SyncTick* data)
-    {
-        return true;
-    }
 }

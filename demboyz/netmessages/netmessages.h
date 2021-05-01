@@ -31,7 +31,7 @@ namespace NetMsg
         svc_VoiceInit = 14,         // inits used voice codecs & quality
         svc_VoiceData = 15,         // Voicestream data from the server
 
-        //svc_HLTV = 16,            // HLTV control messages
+        svc_HLTV = 16,            // HLTV control messages
 
         svc_Sounds = 17,            // starts playing sound
 
@@ -42,10 +42,10 @@ namespace NetMsg
         svc_BSPDecal = 21,          // add a static decal to the world BSP
 
         // NOTE: This is now unused!
-        // svc_TerrainMod = 22,     // modification to the terrain/displacement
+        svc_TerrainMod = 22,     // modification to the terrain/displacement
 
         // Message from server side to client side entity
-        svc_UserMessage = 23,       // a game specific message 
+        svc_UserMessage = 23,       // a game specific message
         svc_EntityMessage = 24,     // a message for an entity
         svc_GameEvent = 25,         // global game event fired
 

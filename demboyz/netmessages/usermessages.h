@@ -1,0 +1,56 @@
+
+#pragma once
+
+namespace UserMsg
+{
+    enum
+    {
+        Geiger                       = 0,
+        Train                        = 1,
+        HudText                      = 2,
+        SayText                      = 3,
+        SayText2                     = 4,
+        TextMsg                      = 5,
+        HudMsg                       = 6,
+        ResetHUD                     = 7,
+        GameTitle                    = 8,
+        ItemPickup                   = 9,
+        ShowMenu                     = 10,
+        Shake                        = 11,
+        Fade                         = 12,
+        VGUIMenu                     = 13,
+        Rumble                       = 14,
+        CloseCaption                 = 15,
+        SendAudio                    = 16,
+        RawAudio                     = 17,
+        VoiceMask                    = 18,
+        RequestState                 = 19,
+        BarTime                      = 20,
+        Damage                       = 21,
+        RadioText                    = 22,
+        HintText                     = 23,
+        KeyHintText                  = 24,
+        ReloadEffect                 = 25,
+        PlayerAnimEvent              = 26,
+        AmmoDenied                   = 27,
+        UpdateRadar                  = 28,
+        KillCam                      = 29,
+        MarkAchievement              = 30,
+        CallVoteFailed               = 31,
+        VoteStart                    = 32,
+        VotePass                     = 33,
+        VoteFailed                   = 34,
+        VoteSetup                    = 35,
+        SPHapWeapEvent               = 36,
+        HapDmg                       = 37,
+        HapPunch                     = 38,
+        HapSetDrag                   = 39,
+        HapSetConst                  = 40,
+        HapMeleeContact              = 41,
+        PlayerStatsUpdate_DEPRECATED = 42,
+        AchievementEvent             = 43,
+        MatchEndConditions           = 44,
+        MatchStatsUpdate             = 45,
+        PlayerStatsUpdate            = 46
+    };
+}

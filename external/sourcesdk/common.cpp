@@ -1,6 +1,7 @@
 
 #include "sourcesdk/common.h"
-#include "snappy/snappy.h"
+#include "snappy.h"
+#include "snappy-sinksource.h"
 #include <string.h>
 
 static const uint32 INVALID = static_cast<uint32>(-1);
@@ -44,7 +45,7 @@ uint32 COM_BufferToBufferDecompress(uint8* dest, uint32 destLen, const uint8* sr
 
 uint32 COM_GetUncompressedSize(const uint8* data, uint32 numBytes)
 {
-    size_t uncompressedLength = INVALID;
+    uint32 uncompressedLength = INVALID;
     if (numBytes > 4)
     {
         const uint32 magic = U8ToU32(data);
@@ -55,7 +56,8 @@ uint32 COM_GetUncompressedSize(const uint8* data, uint32 numBytes)
 
         if (magic == SNAPPY_ID)
         {
-            snappy::GetUncompressedLength(reinterpret_cast<const char*>(data + 4), numBytes - 4, &uncompressedLength);
+            snappy::ByteArraySource source = {reinterpret_cast<const char*>(data + 4), numBytes - 4};
+            snappy::GetUncompressedLength(&source, &uncompressedLength);
         }
     }
     return static_cast<uint32>(uncompressedLength);

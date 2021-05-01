@@ -2,12 +2,12 @@
 #include "gameevents.h"
 #include "base/bitfile.h"
 #include <stdio.h>
+#include <iostream>
 
 namespace GameEvents
 {
-    EventDataMap ParseEventData(bf_read& bitbuf, const EventDescriptor& desc, std::vector<char>& stringMem)
+    EventDataMap ParseEventData(bf_read& bitbuf, const EventDescriptor& desc)
     {
-        stringMem.reserve(stringMem.size() + MAX_EVENT_BYTES);
         EventDataMap data;
         char tempStr[MAX_EVENT_BYTES];
         for (const EventValue& value : desc.values)
@@ -18,13 +18,9 @@ namespace GameEvents
             {
             case EventValueType::String:
             {
-                int length = 0;
-                const bool ok = bitbuf.ReadString(tempStr, sizeof(tempStr), false, &length);
+                const bool ok = bitbuf.ReadString(tempStr, sizeof(tempStr), false);
                 assert(ok);
-                length += 1; // for null terminator
-
-                eventData.strOffset = stringMem.size();
-                stringMem.insert(stringMem.end(), tempStr, tempStr + length + 1);
+                eventData.strValue.assign(tempStr);
                 break;
             }
             case EventValueType::Float:
@@ -61,51 +57,41 @@ namespace GameEvents
         return data;
     }
 
-    void PrintEventData(bf_read& bitbuf, const EventDescriptor& desc)
+    void PrintEvent(const char* name, EventDataMap& data)
     {
-        char tempStr[MAX_EVENT_BYTES];
-        printf("%s:\n", desc.name);
-        for (const EventValue& value : desc.values)
+        std::cout << "[EVENT] " << name << "\n";
+        for (const auto& d : data)
         {
-            printf("  %s: ", value.name);
-            switch(value.type)
+            std::cout << "\t" << d.first << ": ";
+            switch(d.second.type)
             {
-            case EventValueType::String:
+            case GameEvents::EventValueType::String:
             {
-                const bool ok = bitbuf.ReadString(tempStr, sizeof(tempStr), false, nullptr);
-                assert(ok);
-                printf("%s\n", tempStr);
-                break;
-            }
-            case EventValueType::Float:
+                std::cout << d.second.strValue << "\n";
+            } break;
+            case GameEvents::EventValueType::Float:
             {
-                printf("%f\n", bitbuf.ReadFloat());
-                break;
-            }
-            case EventValueType::Long:
+                std::cout << d.second.flValue << "\n";
+            } break;
+            case GameEvents::EventValueType::Long:
             {
-                printf("%i\n", bitbuf.ReadSBitLong(32));
-                break;
-            }
-            case EventValueType::Short:
+                std::cout << d.second.i32Value << "\n";
+            } break;
+            case GameEvents::EventValueType::Short:
             {
-                printf("%i\n", bitbuf.ReadSBitLong(16));
-                break;
-            }
-            case EventValueType::Byte:
+                std::cout << d.second.i16Value << "\n";
+            } break;
+            case GameEvents::EventValueType::Byte:
             {
-                printf("%u\n", bitbuf.ReadUBitLong(8));
-                break;
-            }
-            case EventValueType::Bool:
+                std::cout << d.second.u8Value << "\n";
+            } break;
+            case GameEvents::EventValueType::Bool:
             {
-                printf("%s\n", (bitbuf.ReadOneBit() != 0) ? "true" : "false");
-                break;
-            }
-            case EventValueType::Local:
+                std::cout << d.second.bValue << "\n";
+            } break;
             default:
-                assert(false);
-                break;
+            {
+            } break;
             }
         }
     }
