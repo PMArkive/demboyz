@@ -1,6 +1,7 @@
 
 #include "logic.h"
 #include "netmessages/svc_serverinfo.h"
+#include "io/voicewriter/voicedatawriter.h"
 #include <cstring>
 #include <iostream>
 
@@ -13,7 +14,8 @@ Logic::Logic(SourceGameContext* context):
         {"header", {}},
         {"serverinfo", {}},
         {"players", {}},
-        {"chat", {}}
+        {"chat", {}},
+        {"voice", {}}
     });
 }
 
@@ -60,6 +62,9 @@ void Logic::Finish(bool dirty)
         data["demoheader"]["playback_frames"] = context->curFrame;
     }
 
+    data["voice"]["total_time"] = voiceTotalTime;
+    data["voice"]["active_time"] = voiceActiveTime;
+
     std::string out = data.dump(2, ' ', false, json::error_handler_t::replace);
     out.append("\n");
     fwrite(out.c_str(), out.size(), 1, context->outputFp);
@@ -101,6 +106,7 @@ void Logic::OnServerInfo(NetMsg::SVC_ServerInfo* serverInfo)
 
 void Logic::OnClientConnected(int client)
 {
+    assert(client >= 0 && client < MAX_PLAYERS);
     assert(clients[client].connected == -1);
 
     const auto& info = context->players[client].info;
@@ -124,6 +130,7 @@ void Logic::OnClientConnected(int client)
 
 void Logic::OnClientDisconnected(int client, const char* reason)
 {
+    assert(client >= 0 && client < MAX_PLAYERS);
     assert(clients[client].connected != -1);
 
     const auto& info = context->players[client].info;
@@ -146,6 +153,7 @@ void Logic::OnClientDisconnected(int client, const char* reason)
 
 void Logic::OnClientSettingsChanged(int client)
 {
+    assert(client >= 0 && client < MAX_PLAYERS);
     assert(clients[client].connected != -1);
 
     const auto& info = context->players[client].info;
@@ -167,6 +175,9 @@ void Logic::OnClientSettingsChanged(int client)
 
 void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, const char* msgSender, const char* msgText)
 {
+    assert(client >= 0 && client < MAX_PLAYERS);
+    assert(clients[client].connected != -1);
+
     const auto& info = context->players[client].info;
     json chat = {
         {"tick", curTick},
@@ -181,14 +192,29 @@ void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, con
 
 void Logic::OnClientVoiceChat(int client, float length)
 {
+    assert(client >= 0 && client < MAX_PLAYERS);
     assert(clients[client].connected != -1);
 
     clients[client].voiceTime += length;
+    voiceTotalTime += length;
+
+    float now = curTick * context->fTickRate;
+    float endtime = now + length;
+    if (now >= voiceEndTime)
+    {
+        voiceEndTime = endtime;
+        voiceActiveTime += length;
+    }
+    else if (endtime > voiceEndTime)
+    {
+        voiceActiveTime += (endtime - voiceEndTime);
+        voiceEndTime = endtime;
+    }
 }
 
 void Logic::OnVoiceCodec(const char* codec, int quality, int sampleRate)
 {
-    data["voice_init"] = json({
+    data["voice"] = json({
         {"codec", codec},
         {"quality", quality},
         {"sampleRate", sampleRate}

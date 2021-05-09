@@ -13,28 +13,28 @@
 
 void DemHandlers::CreateDemMsgStructs(DemDataStructArray& demDataStructs)
 {
-    demDataStructs[0] = new DemMsg::Dem_Unknown();
-    demDataStructs[1] = new DemMsg::Dem_Packet();
-    demDataStructs[2] = new DemMsg::Dem_Packet();
-    demDataStructs[3] = new DemMsg::Dem_SyncTick();
-    demDataStructs[4] = new DemMsg::Dem_ConsoleCmd();
-    demDataStructs[5] = new DemMsg::Dem_UserCmd();
-    demDataStructs[6] = new DemMsg::Dem_DataTables();
-    demDataStructs[7] = new DemMsg::Dem_Stop();
-    demDataStructs[8] = new DemMsg::Dem_StringTables();
+    demDataStructs[dem_unknown] = new DemMsg::Dem_Unknown();
+    demDataStructs[dem_signon] = new DemMsg::Dem_Packet();
+    demDataStructs[dem_packet] = new DemMsg::Dem_Packet();
+    demDataStructs[dem_synctick] = new DemMsg::Dem_SyncTick();
+    demDataStructs[dem_consolecmd] = new DemMsg::Dem_ConsoleCmd();
+    demDataStructs[dem_usercmd] = new DemMsg::Dem_UserCmd();
+    demDataStructs[dem_datatables] = new DemMsg::Dem_DataTables();
+    demDataStructs[dem_stop] = new DemMsg::Dem_Stop();
+    demDataStructs[dem_stringtables] = new DemMsg::Dem_StringTables();
 }
 
 void DemHandlers::DestroyDemMsgStructs(DemDataStructArray& demDataStructs)
 {
-    delete reinterpret_cast<DemMsg::Dem_Unknown*>(demDataStructs[0]);
-    delete reinterpret_cast<DemMsg::Dem_Packet*>(demDataStructs[1]);
-    delete reinterpret_cast<DemMsg::Dem_Packet*>(demDataStructs[2]);
-    delete reinterpret_cast<DemMsg::Dem_SyncTick*>(demDataStructs[3]);
-    delete reinterpret_cast<DemMsg::Dem_ConsoleCmd*>(demDataStructs[4]);
-    delete reinterpret_cast<DemMsg::Dem_UserCmd*>(demDataStructs[5]);
-    delete reinterpret_cast<DemMsg::Dem_DataTables*>(demDataStructs[6]);
-    delete reinterpret_cast<DemMsg::Dem_Stop*>(demDataStructs[7]);
-    delete reinterpret_cast<DemMsg::Dem_StringTables*>(demDataStructs[8]);
+    delete reinterpret_cast<DemMsg::Dem_Unknown*>(demDataStructs[dem_unknown]);
+    delete reinterpret_cast<DemMsg::Dem_Packet*>(demDataStructs[dem_signon]);
+    delete reinterpret_cast<DemMsg::Dem_Packet*>(demDataStructs[dem_packet]);
+    delete reinterpret_cast<DemMsg::Dem_SyncTick*>(demDataStructs[dem_synctick]);
+    delete reinterpret_cast<DemMsg::Dem_ConsoleCmd*>(demDataStructs[dem_consolecmd]);
+    delete reinterpret_cast<DemMsg::Dem_UserCmd*>(demDataStructs[dem_usercmd]);
+    delete reinterpret_cast<DemMsg::Dem_DataTables*>(demDataStructs[dem_datatables]);
+    delete reinterpret_cast<DemMsg::Dem_Stop*>(demDataStructs[dem_stop]);
+    delete reinterpret_cast<DemMsg::Dem_StringTables*>(demDataStructs[dem_stringtables]);
 }
 
 #define DECLARE_DEM_HANDLER_ARRAY(funcname) \

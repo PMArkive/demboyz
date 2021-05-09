@@ -34,6 +34,9 @@ struct Logic
     void OnVoiceCodec(const char* codec, int quality, int sampleRate);
 
     int32_t curTick = 0;
+    float voiceTotalTime = 0.0f;
+    float voiceActiveTime = 0.0f;
+    float voiceEndTime = 0.0f;
     SourceGameContext* context = nullptr;
     json data;
 };

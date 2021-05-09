@@ -74,7 +74,7 @@ private:
         int sampleRate = 0;
     };
 
-    int ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerVoiceState& state);
+    int ParseSteamVoicePacket(const uint8_t* bytes, int numBytes, PlayerVoiceState& state);
 
 private:
     SourceGameContext *context = nullptr;
@@ -88,7 +88,7 @@ private:
     int32_t m_silenceTicks = 0;
     const char* m_outputPath = nullptr;
 
-    int16_t m_decodeBuffer[8192];
+    int16_t m_decodeBuffer[16384];
 
     static const int sQuality = 3;
     eCodec m_Codec = CODEC_NONE;

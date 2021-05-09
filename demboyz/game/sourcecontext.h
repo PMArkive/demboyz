@@ -105,7 +105,7 @@ struct SourceGameContext
 
 	struct
 	{
-		bool connected;
+		bool connected = false;
 		player_info_t info;
 	} players[MAX_PLAYERS];
 };

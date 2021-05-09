@@ -19,11 +19,12 @@ SourceGameContext::SourceGameContext(std::string outputDir, std::string outputDi
     outputDirVoice(outputDirVoice)
 {
     stringTables = new StringTableContainer(this);
-    memset(players, 0, sizeof(players));
 }
 
 SourceGameContext::~SourceGameContext()
 {
+    delete voiceWriter;
+    voiceWriter = nullptr;
     delete logic;
     logic = nullptr;
 
@@ -101,7 +102,7 @@ void SourceGameContext::OnNetPacket(NetPacket& packet)
 
         if(umsg->msgType == UserMsg::SayText2)
         {
-            int client = msg.ReadByte();
+            int client = msg.ReadByte() - 1;
             bool bWantsToChat = msg.ReadByte();
 
             char msgName[2048] = {0};
@@ -120,7 +121,6 @@ void SourceGameContext::OnNetPacket(NetPacket& packet)
     {
         voiceWriter->OnNetPacket(packet);
     }
-
 }
 
 void SourceGameContext::OnGameEvent(const char *name, GameEvents::EventDataMap &data)

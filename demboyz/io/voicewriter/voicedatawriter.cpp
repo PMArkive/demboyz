@@ -87,11 +87,11 @@ void CeltVoiceDecoder::DecodeFrame(const uint8_t* compressedData, int16_t* uncom
 
 bool SilkVoiceDecoder::DoInit(int32_t sampleRate)
 {
-    m_Silk_DecoderControl.API_sampleRate = sampleRate;
     if(m_Silk_DecoderState)
     {
         return false;
     }
+    m_Silk_DecoderControl.API_sampleRate = sampleRate;
 
     int decoderSize;
 	SKP_Silk_SDK_Get_Decoder_Size(&decoderSize);
@@ -154,7 +154,7 @@ void VoiceDataWriter::Finish()
         state.second.celt_decoder.Destroy();
         state.second.silk_decoder.Destroy();
 
-        state.second.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.second.sampleRate) / context->fTickRate);
+        state.second.fileWriter.PadSilence((((uint64_t)m_curTick - m_silenceTicks) * 1000000UL) / (uint64_t)(context->fTickRate * 1000UL));
         state.second.fileWriter.Close();
         state.second.lastVoiceDataTick = -1;
     }
@@ -174,22 +174,22 @@ void VoiceDataWriter::StartCommandPacket(const CommandPacket& packet)
 
 void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
 {
-    const int tickMargin = context->fTickRate / 10.0; // 100ms
+    const int tickMargin = context->fTickInterval * 150.0; // ms
     if (m_curTick <= tickMargin)
         return;
 
-    // Skip silence if noone talks for at least 5 seconds
-    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 5.0)
+    // Skip silence if noone talks for at least 3 seconds
+    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 3.0)
         m_silenceTicks += (m_curTick - m_lastTick);
 
     for(auto& state : m_playerVoiceStates)
     {
         if((m_curTick - state.second.lastVoiceDataTick) > tickMargin)
-            state.second.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.second.sampleRate) / context->fTickRate);
+            state.second.fileWriter.PadSilence((((uint64_t)m_curTick - m_silenceTicks) * 1000000UL) / (uint64_t)(context->fTickRate * 1000UL));
     }
 }
 
-int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerVoiceState& state)
+int VoiceDataWriter::ParseSteamVoicePacket(const uint8_t* bytes, int numBytes, PlayerVoiceState& state)
 {
     int numDecompressedSamples = 0;
     int pos = 0;
@@ -222,10 +222,10 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
             {
                 if(pos + 2 > dataLen)
                     return numDecompressedSamples;
-                short rate = *((int16_t *)&bytes[pos]);
+                uint16_t rate = *((int16_t *)&bytes[pos]);
                 pos += 2;
-                state.silk_decoder.DoInit(rate);
-                state.sampleRate = rate;
+                if(state.silk_decoder.DoInit(rate))
+                    state.sampleRate = rate;
             } break;
             case 10: // Unknown / Unused
             {
@@ -241,14 +241,16 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
             {
                 if(pos + 2 > dataLen)
                     return numDecompressedSamples;
-                short length = *((int16_t *)&bytes[pos]);
+                uint16_t length = *((int16_t *)&bytes[pos]);
                 pos += 2;
 
                 if(pos + length > dataLen)
                     return numDecompressedSamples;
 
+                int freeSamples = (sizeof(m_decodeBuffer) / sizeof(int16_t)) - numDecompressedSamples;
                 if(payloadType == 3)
                 {
+                    length = MIN(freeSamples * 2, length);
                     memcpy(&m_decodeBuffer[numDecompressedSamples], &bytes[pos], length);
                     numDecompressedSamples += length / sizeof(int16_t);
                 }
@@ -258,10 +260,10 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
                     int maxpos = tpos + length;
                     while(tpos <= (maxpos - 2))
                     {
-                        short chunkLength = *((int16_t *)&bytes[tpos]);
+                        int16_t chunkLength = *((int16_t *)&bytes[tpos]);
                         tpos += 2;
 
-                        if(chunkLength == -1)
+                        if(chunkLength < 0)
                         {
                             state.silk_decoder.Reset();
                             continue;
@@ -270,6 +272,7 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
                         {
                             // DTX (discontinued transmission)
                             int numEmptySamples = state.sampleRate / 50;
+                            numEmptySamples = MIN(freeSamples, numEmptySamples);
                             memset(&m_decodeBuffer[numDecompressedSamples], 0, numEmptySamples * sizeof(int16_t));
                             numDecompressedSamples += numEmptySamples;
                             continue;
@@ -278,8 +281,7 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
                         if(tpos + chunkLength > maxpos)
                             return numDecompressedSamples;
 
-                        int ret = state.silk_decoder.Decompress(&bytes[tpos], chunkLength, &m_decodeBuffer[numDecompressedSamples],
-                            (sizeof(m_decodeBuffer) / sizeof(int16_t)) - numDecompressedSamples);
+                        int ret = state.silk_decoder.Decompress(&bytes[tpos], chunkLength, &m_decodeBuffer[numDecompressedSamples], freeSamples);
                         numDecompressedSamples += ret;
                         tpos += chunkLength;
                     }
@@ -291,7 +293,9 @@ int VoiceDataWriter::ParseSteamVoicePacket(uint8_t* bytes, int numBytes, PlayerV
             {
                 if(pos + 2 > dataLen)
                     return numDecompressedSamples;
-                short numSamples = *((int16_t *)&bytes[pos]);
+                uint16_t numSamples = *((uint16_t *)&bytes[pos]);
+                int freeSamples = (sizeof(m_decodeBuffer) / sizeof(int16_t)) - numDecompressedSamples;
+                numSamples = MIN(freeSamples, numSamples);
                 memset(&m_decodeBuffer[numDecompressedSamples], 0, numSamples * sizeof(int16_t));
                 numDecompressedSamples += numSamples;
                 pos += 2;
@@ -329,7 +333,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
         assert(voiceData->fromClientIndex < MAX_PLAYERS);
         const char* guid = context->players[voiceData->fromClientIndex].info.guid;
 
-        uint8_t* bytes = voiceData->data.get();
+        const uint8_t* bytes = voiceData->data.get();
         assert((voiceData->dataLengthInBits % 8) == 0);
         const int numBytes = voiceData->dataLengthInBits / 8;
 
@@ -343,7 +347,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
             state.sampleRate = config.sampleRate;
 
             state.celt_decoder.DoInit(m_celtMode, config.frameSizeSamples, config.encodedFrameSizeBytes);
-            numDecompressedSamples = state.celt_decoder.Decompress(bytes, numBytes, m_decodeBuffer, sizeof(m_decodeBuffer));
+            numDecompressedSamples = state.celt_decoder.Decompress(bytes, numBytes, m_decodeBuffer, sizeof(m_decodeBuffer) / sizeof(int16_t));
         }
         else
         {
@@ -366,7 +370,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
         {
             std::string name = std::string(m_outputPath) + "/" + std::string(guid) + ".opus";
             state.fileWriter.Init(name.c_str(), state.sampleRate);
-            state.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.sampleRate) / context->fTickRate);
+            state.fileWriter.PadSilence((((uint64_t)m_curTick - m_silenceTicks) * 1000000UL) / (uint64_t)(context->fTickRate * 1000UL));
         }
 
         state.fileWriter.WriteSamples(m_decodeBuffer, numDecompressedSamples);

@@ -24,6 +24,7 @@ public:
     void Init(const char* file, uint32_t sampleRate)
     {
         assert(!m_Enc);
+        m_SampleRate = sampleRate;
         m_Samples = 0;
 
         m_Comments = ope_comments_create();
@@ -56,8 +57,9 @@ public:
         m_Samples += numSamples;
     }
 
-    void PadSilence(uint64_t numSamples)
+    void PadSilence(uint64_t milliseconds)
     {
+        uint64_t numSamples = (milliseconds * (uint64_t)m_SampleRate) / 1000UL;
         if(!m_Enc || m_Samples >= numSamples)
             return;
 
@@ -75,6 +77,7 @@ public:
 private:
     OggOpusComments *m_Comments = nullptr;
     OggOpusEnc *m_Enc = nullptr;
+    uint32_t m_SampleRate = 0;
     uint64_t m_Samples = 0;
 
     static const uint32_t bytesPerSample = 2;
