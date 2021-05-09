@@ -154,7 +154,7 @@ void VoiceDataWriter::Finish()
         state.second.celt_decoder.Destroy();
         state.second.silk_decoder.Destroy();
 
-        state.second.fileWriter.PadSilence((m_curTick * state.second.sampleRate) / context->fTickRate);
+        state.second.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.second.sampleRate) / context->fTickRate);
         state.second.fileWriter.Close();
         state.second.lastVoiceDataTick = -1;
     }
@@ -168,6 +168,7 @@ void VoiceDataWriter::Finish()
 
 void VoiceDataWriter::StartCommandPacket(const CommandPacket& packet)
 {
+    m_lastTick = m_curTick;
     m_curTick = packet.tick;
 }
 
@@ -177,10 +178,14 @@ void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
     if (m_curTick <= tickMargin)
         return;
 
+    // Skip silence if noone talks for at least 5 seconds
+    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 5.0)
+        m_silenceTicks += (m_curTick - m_lastTick);
+
     for(auto& state : m_playerVoiceStates)
     {
         if((m_curTick - state.second.lastVoiceDataTick) > tickMargin)
-            state.second.fileWriter.PadSilence((m_curTick * state.second.sampleRate) / context->fTickRate);
+            state.second.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.second.sampleRate) / context->fTickRate);
     }
 }
 
@@ -361,7 +366,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
         {
             std::string name = std::string(m_outputPath) + "/" + std::string(guid) + ".opus";
             state.fileWriter.Init(name.c_str(), state.sampleRate);
-            state.fileWriter.PadSilence((m_curTick * state.sampleRate) / context->fTickRate);
+            state.fileWriter.PadSilence(((uint64_t)(m_curTick - m_silenceTicks) * state.sampleRate) / context->fTickRate);
         }
 
         state.fileWriter.WriteSamples(m_decodeBuffer, numDecompressedSamples);
@@ -369,5 +374,6 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
         context->logic->OnClientVoiceChat(voiceData->fromClientIndex, (float)numDecompressedSamples / (float)state.sampleRate);
 
         state.lastVoiceDataTick = m_curTick;
+        m_lastVoiceTick = m_curTick;
     }
 }

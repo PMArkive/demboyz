@@ -56,13 +56,13 @@ public:
         m_Samples += numSamples;
     }
 
-    void PadSilence(uint32_t numSamples)
+    void PadSilence(uint64_t numSamples)
     {
         if(!m_Enc || m_Samples >= numSamples)
             return;
 
         static const int16_t silence[128] = {0};
-        uint32_t pad = numSamples - m_Samples;
+        uint64_t pad = numSamples - m_Samples;
         while(pad > 0)
         {
             const int samples = MIN(sizeof(silence) / bytesPerSample, pad);
@@ -75,7 +75,7 @@ public:
 private:
     OggOpusComments *m_Comments = nullptr;
     OggOpusEnc *m_Enc = nullptr;
-    uint32_t m_Samples = 0;
+    uint64_t m_Samples = 0;
 
     static const uint32_t bytesPerSample = 2;
 };

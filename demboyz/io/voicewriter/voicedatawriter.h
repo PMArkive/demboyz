@@ -81,7 +81,11 @@ private:
     CELTMode* m_celtMode = nullptr;
     std::map<std::string, PlayerVoiceState> m_playerVoiceStates;
 
-    int32_t m_curTick = -1;
+    int32_t m_curTick = 0;
+    int32_t m_lastTick = 0;
+
+    int32_t m_lastVoiceTick = 0;
+    int32_t m_silenceTicks = 0;
     const char* m_outputPath = nullptr;
 
     int16_t m_decodeBuffer[8192];
