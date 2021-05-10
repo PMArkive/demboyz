@@ -31,7 +31,7 @@ int main(const int argc, const char* argv[])
     if (!context.init())
         return -1;
 
-    bool error = DemoReader::ProcessDem(inputFp, &context);
+    bool error = !DemoReader::ProcessDem(inputFp, &context);
 
     fclose(inputFp);
 
