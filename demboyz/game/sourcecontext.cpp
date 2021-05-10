@@ -64,8 +64,8 @@ void SourceGameContext::Start()
 
 void SourceGameContext::Finish(bool dirty)
 {
-    logic->Finish(dirty);
     voiceWriter->Finish();
+    logic->Finish(dirty);
 }
 
 void SourceGameContext::StartCommandPacket(const CommandPacket& packet)

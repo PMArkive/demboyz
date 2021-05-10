@@ -149,6 +149,12 @@ void VoiceDataWriter::Start()
 
 void VoiceDataWriter::Finish()
 {
+    if(m_isSilenced)
+    {
+        m_isSilenced = false;
+        m_silence.back().second = m_curTick;
+    }
+
     for(auto& state : m_playerVoiceStates)
     {
         state.second.celt_decoder.Destroy();
@@ -180,7 +186,19 @@ void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
 
     // Skip silence if noone talks for at least 3 seconds
     if((m_curTick - m_lastVoiceTick) / context->fTickRate > 3.0)
+    {
+        if(!m_isSilenced)
+        {
+            m_isSilenced = true;
+            m_silence.emplace_back(std::make_pair(m_curTick, 0));
+        }
         m_silenceTicks += (m_curTick - m_lastTick);
+    }
+    else if(m_isSilenced)
+    {
+        m_isSilenced = false;
+        m_silence.back().second = m_curTick;
+    }
 
     for(auto& state : m_playerVoiceStates)
     {

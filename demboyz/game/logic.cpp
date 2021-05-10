@@ -66,6 +66,11 @@ void Logic::Finish(bool dirty)
     data["voice"]["total_time"] = voiceTotalTime;
     data["voice"]["active_time"] = voiceActiveTime;
 
+    for(const auto& o : context->voiceWriter->m_silence)
+    {
+        data["voice"]["silence"] += json({o.first, o.second});
+    }
+
     std::string out = data.dump(2, ' ', false, json::error_handler_t::replace);
     out.append("\n");
     fwrite(out.c_str(), out.size(), 1, context->outputFp);

@@ -92,4 +92,8 @@ private:
 
     static const int sQuality = 3;
     eCodec m_Codec = CODEC_NONE;
+
+public:
+    bool m_isSilenced = false;
+    std::vector<std::pair<int32_t, int32_t>> m_silence;
 };
