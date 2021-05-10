@@ -10,6 +10,7 @@
 #include "game/logic.h"
 #include "io/voicewriter/voicedatawriter.h"
 #include <iostream>
+#include <limits.h>
 
 #include "netmessages/svc_voiceinit.h"
 #include "netmessages/svc_voicedata.h"
@@ -19,6 +20,8 @@ SourceGameContext::SourceGameContext(std::string outputDir, std::string outputDi
     outputDirVoice(outputDirVoice)
 {
     stringTables = new StringTableContainer(this);
+    userIdLookUp = new uint8_t[USHRT_MAX+1];
+    memset(userIdLookUp, 0xFF, USHRT_MAX+1);
 }
 
 SourceGameContext::~SourceGameContext()
@@ -33,6 +36,8 @@ SourceGameContext::~SourceGameContext()
     gameEventList = nullptr;
     delete stringTables;
     stringTables = nullptr;
+    delete userIdLookUp;
+    userIdLookUp = nullptr;
 
     fclose(outputFp);
 }
@@ -130,15 +135,45 @@ void SourceGameContext::OnGameEvent(const char *name, GameEvents::EventDataMap &
     if (strcmp(name, "player_disconnect") == 0)
     {
         int userid = data["userid"].i16Value;
-        for (int client = 0; client < MAX_PLAYERS; client++)
+        int client = userIdLookUp[userid];
+
+        // player_disconnect can fire for clients which never connected
+        // (ESC during mapchange)
+        if(client != 0xFF)
         {
             auto& p = players[client];
-            if (!p.connected || p.info.userID != userid)
-                continue;
+            assert(p.connected && p.info.userID == userid);
 
             p.connected = false;
             logic->OnClientDisconnected(client, data["reason"].strValue.c_str());
+            userIdLookUp[userid] = 0xFF;
         }
+    }
+
+    else if (strcmp(name, "player_death") == 0)
+    {
+        int client = userIdLookUp[data["userid"].i16Value];
+        assert(client >= 0 && client < MAX_PLAYERS);
+
+        int attacker = data["attacker"].i16Value;
+        if(attacker > 0)
+        {
+            attacker = userIdLookUp[attacker];
+            assert(attacker >= 0 && attacker < MAX_PLAYERS);
+        }
+        else
+            attacker = -1;
+
+        logic->OnClientDeath(client, attacker, data["headshot"].bValue, data["weapon"].strValue.c_str());
+    }
+
+    else if (strcmp(name, "round_start") == 0)
+    {
+        logic->OnRoundStart(data["timelimit"].i32Value);
+    }
+    else if (strcmp(name, "round_end") == 0)
+    {
+        logic->OnRoundEnd(data["message"].strValue.c_str(), data["reason"].u8Value, data["winner"].u8Value);
     }
 }
 
@@ -155,16 +190,21 @@ void SourceGameContext::UserInfoChanged(int tableIdx, int entryIdx)
     StringTableEntry &entry = stringTables->tables[tableIdx].entries[entryIdx];
 
     int client = std::stoi(entry.string);
+    assert(client >= 0 && client < MAX_PLAYERS);
     player_info_t *info = (player_info_t *)entry.data.data();
 
     if (entry.data.size() != sizeof(player_info_t))
     {
+        if(players[client].connected)
+            userIdLookUp[players[client].info.userID] = 0xFF;
+
         memset(&players[client].info, 0, sizeof(player_info_t));
         players[client].connected = false;
         return;
     }
 
     memcpy(&players[client].info, info, sizeof(player_info_t));
+    userIdLookUp[info->userID] = client;
 
     if (!players[client].connected)
         logic->OnClientConnected(client);

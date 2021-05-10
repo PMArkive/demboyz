@@ -14,6 +14,7 @@ Logic::Logic(SourceGameContext* context):
         {"header", {}},
         {"serverinfo", {}},
         {"players", {}},
+        {"events", {}},
         {"chat", {}},
         {"voice", {}}
     });
@@ -117,13 +118,27 @@ void Logic::OnClientConnected(int client)
         player = json({
             {"names", {}},
             {"sprays", {}},
-            {"disconnect_reasons", {}},
             {"playtime", 0},
-            {"voicetime", 0.0f}
+            {"voicetime", 0.0f},
+            {"kills", 0},
+            {"deaths", 0},
+            {"chats", 0}
         });
     }
 
     clients[client].connected = curTick;
+    clients[client].kills = 0;
+    clients[client].deaths = 0;
+    clients[client].chats = 0;
+    clients[client].voiceTime = 0.0f;
+
+    json player_connect = {
+        {"event", "player_connect"},
+        {"tick", curTick},
+        {"steamid", info.guid},
+        {"name", info.name}
+    };
+    data["events"] += player_connect;
 
     OnClientSettingsChanged(client);
 }
@@ -146,7 +161,28 @@ void Logic::OnClientDisconnected(int client, const char* reason)
     voicetime += player["voicetime"].get<float>();
     player["voicetime"] = voicetime;
 
-    player["disconnect_reasons"] += reason;
+    // cumulative kills
+    int kills = clients[client].kills;
+    kills += player["kills"].get<int>();
+    player["kills"] = kills;
+
+    // cumulative deaths
+    int deaths = clients[client].deaths;
+    deaths += player["deaths"].get<int>();
+    player["deaths"] = deaths;
+
+    // cumulative chats
+    int chats = clients[client].chats;
+    chats += player["chats"].get<int>();
+    player["chats"] = chats;
+
+    json player_disconnect = {
+        {"event", "player_disconnect"},
+        {"tick", curTick},
+        {"steamid", info.guid},
+        {"reason", reason}
+    };
+    data["events"] += player_disconnect;
 
     clients[client].connected = -1;
 }
@@ -173,10 +209,39 @@ void Logic::OnClientSettingsChanged(int client)
     }
 }
 
+void Logic::OnClientDeath(int client, int attacker, bool headshot, const char* weapon)
+{
+    assert(client >= 0 && client < MAX_PLAYERS);
+    assert(clients[client].connected != -1);
+
+    const char *victim_guid = context->players[client].info.guid;
+    const char *attacker_guid = "";
+
+    clients[client].deaths++;
+    if(attacker >= 0 && attacker < MAX_PLAYERS)
+    {
+        clients[attacker].kills++;
+        attacker_guid = context->players[attacker].info.guid;
+    }
+
+    json player_death = {
+        {"tick", curTick},
+        {"event", "player_death"},
+        {"victim", victim_guid},
+        {"attacker", attacker_guid},
+        {"headshot", headshot},
+        {"weapon", weapon}
+    };
+
+    data["events"] += player_death;
+}
+
 void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, const char* msgSender, const char* msgText)
 {
     assert(client >= 0 && client < MAX_PLAYERS);
     assert(clients[client].connected != -1);
+
+    clients[client].chats++;
 
     const auto& info = context->players[client].info;
     json chat = {
@@ -193,7 +258,8 @@ void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, con
 void Logic::OnClientVoiceChat(int client, float length)
 {
     assert(client >= 0 && client < MAX_PLAYERS);
-    assert(clients[client].connected != -1);
+    if (clients[client].connected == -1)
+        return;
 
     clients[client].voiceTime += length;
     voiceTotalTime += length;
@@ -219,4 +285,28 @@ void Logic::OnVoiceCodec(const char* codec, int quality, int sampleRate)
         {"quality", quality},
         {"sampleRate", sampleRate}
     });
+}
+
+void Logic::OnRoundStart(int timelimit)
+{
+    json round_start = {
+        {"event", "round_start"},
+        {"tick", curTick},
+        {"timelimit", timelimit},
+    };
+
+    data["events"] += round_start;
+}
+
+void Logic::OnRoundEnd(const char *message, int reason, int winner)
+{
+    json round_end = {
+        {"event", "round_end"},
+        {"tick", curTick},
+        {"message", message},
+        {"reason", reason},
+        {"winner", winner}
+    };
+
+    data["events"] += round_end;
 }

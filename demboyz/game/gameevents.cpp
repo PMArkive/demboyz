@@ -83,7 +83,7 @@ namespace GameEvents
             } break;
             case GameEvents::EventValueType::Byte:
             {
-                std::cout << d.second.u8Value << "\n";
+                std::cout << unsigned(d.second.u8Value) << "\n";
             } break;
             case GameEvents::EventValueType::Bool:
             {

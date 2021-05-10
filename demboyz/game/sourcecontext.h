@@ -108,4 +108,6 @@ struct SourceGameContext
 		bool connected = false;
 		player_info_t info;
 	} players[MAX_PLAYERS];
+
+	uint8_t *userIdLookUp = nullptr;
 };
