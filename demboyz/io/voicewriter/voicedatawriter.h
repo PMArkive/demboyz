@@ -88,7 +88,7 @@ private:
     int32_t m_silenceTicks = 0;
     const char* m_outputPath = nullptr;
 
-    int16_t m_decodeBuffer[16384];
+    int16_t m_decodeBuffer[32768];
 
     static const int sQuality = 3;
     eCodec m_Codec = CODEC_NONE;

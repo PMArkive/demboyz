@@ -243,8 +243,10 @@ void Logic::OnClientDeath(int client, int attacker, bool headshot, const char* w
 
 void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, const char* msgSender, const char* msgText)
 {
-    assert(client >= 0 && client < MAX_PLAYERS);
-    assert(clients[client].connected != -1);
+    //assert(client >= 0 && client < MAX_PLAYERS);
+    //assert(clients[client].connected != -1);
+    if(client < 0 || client > MAX_PLAYERS || clients[client].connected == -1)
+        return;
 
     clients[client].chats++;
 
@@ -262,8 +264,7 @@ void Logic::OnClientChat(int client, bool bWantsToChat, const char* msgName, con
 
 void Logic::OnClientVoiceChat(int client, float length)
 {
-    assert(client >= 0 && client < MAX_PLAYERS);
-    if (clients[client].connected == -1)
+    if(client < 0 || client > MAX_PLAYERS || clients[client].connected == -1)
         return;
 
     clients[client].voiceTime += length;

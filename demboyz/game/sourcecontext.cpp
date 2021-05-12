@@ -130,7 +130,7 @@ void SourceGameContext::OnNetPacket(NetPacket& packet)
 
 void SourceGameContext::OnGameEvent(const char *name, GameEvents::EventDataMap &data)
 {
-    // GameEvents::PrintEvent(name, data);
+    //GameEvents::PrintEvent(name, data);
 
     if (strcmp(name, "player_disconnect") == 0)
     {
@@ -153,13 +153,17 @@ void SourceGameContext::OnGameEvent(const char *name, GameEvents::EventDataMap &
     else if (strcmp(name, "player_death") == 0)
     {
         int client = userIdLookUp[data["userid"].i16Value];
-        assert(client >= 0 && client < MAX_PLAYERS);
+        //assert(client >= 0 && client < MAX_PLAYERS);
+        if(client < 0 || client > MAX_PLAYERS)
+            return;
 
         int attacker = data["attacker"].i16Value;
         if(attacker > 0)
         {
             attacker = userIdLookUp[attacker];
-            assert(attacker >= 0 && attacker < MAX_PLAYERS);
+            //assert(attacker >= 0 && attacker < MAX_PLAYERS);
+            if(attacker < 0 || attacker > MAX_PLAYERS)
+                attacker = -1;
         }
         else
             attacker = -1;

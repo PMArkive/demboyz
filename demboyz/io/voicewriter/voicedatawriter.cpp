@@ -266,11 +266,14 @@ int VoiceDataWriter::ParseSteamVoicePacket(const uint8_t* bytes, int numBytes, P
                     return numDecompressedSamples;
 
                 int freeSamples = (sizeof(m_decodeBuffer) / sizeof(int16_t)) - numDecompressedSamples;
+                if(freeSamples <= 0)
+                    return numDecompressedSamples;
+
                 if(payloadType == 3)
                 {
-                    length = MIN(freeSamples * 2, length);
-                    memcpy(&m_decodeBuffer[numDecompressedSamples], &bytes[pos], length);
-                    numDecompressedSamples += length / sizeof(int16_t);
+                    int vlen = MIN(freeSamples * 2, length);
+                    memcpy(&m_decodeBuffer[numDecompressedSamples], &bytes[pos], vlen);
+                    numDecompressedSamples += vlen / sizeof(int16_t);
                 }
                 else if(payloadType == 4)
                 {
@@ -293,6 +296,7 @@ int VoiceDataWriter::ParseSteamVoicePacket(const uint8_t* bytes, int numBytes, P
                             numEmptySamples = MIN(freeSamples, numEmptySamples);
                             memset(&m_decodeBuffer[numDecompressedSamples], 0, numEmptySamples * sizeof(int16_t));
                             numDecompressedSamples += numEmptySamples;
+                            freeSamples -= numEmptySamples;
                             continue;
                         }
 
@@ -301,6 +305,7 @@ int VoiceDataWriter::ParseSteamVoicePacket(const uint8_t* bytes, int numBytes, P
 
                         int ret = state.silk_decoder.Decompress(&bytes[tpos], chunkLength, &m_decodeBuffer[numDecompressedSamples], freeSamples);
                         numDecompressedSamples += ret;
+                        freeSamples -= ret;
                         tpos += chunkLength;
                     }
                 }
@@ -348,7 +353,9 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
     else if(packet.type == NetMsg::svc_VoiceData)
     {
         NetMsg::SVC_VoiceData* voiceData = static_cast<NetMsg::SVC_VoiceData*>(packet.data);
-        assert(voiceData->fromClientIndex < MAX_PLAYERS);
+        if(voiceData->fromClientIndex < 0 || voiceData->fromClientIndex >= MAX_PLAYERS)
+            return;
+
         const char* guid = context->players[voiceData->fromClientIndex].info.guid;
 
         const uint8_t* bytes = voiceData->data.get();
@@ -381,7 +388,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
             }
         }
 
-        if(numDecompressedSamples <= 0)
+        if(numDecompressedSamples <= 0 || state.sampleRate <= 0)
             return;
 
         if(state.lastVoiceDataTick == -1)
