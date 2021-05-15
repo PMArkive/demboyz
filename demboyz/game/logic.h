@@ -26,6 +26,8 @@ struct Logic
         int deaths = 0;
         int chats = 0;
         float voiceTime = 0.0f;
+        std::string name;
+        int32_t nametime = -1;
     } clients[MAX_PLAYERS];
 
     void OnServerInfo(NetMsg::SVC_ServerInfo* serverInfo);

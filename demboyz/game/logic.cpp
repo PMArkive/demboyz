@@ -9,9 +9,8 @@
 Logic::Logic(SourceGameContext* context):
     context(context)
 {
-    //memset(clients, 0, sizeof(clients));
     data = json({
-        {"header", {}},
+        {"demoheader", {}},
         {"serverinfo", {}},
         {"players", {}},
         {"events", {}},
@@ -136,6 +135,8 @@ void Logic::OnClientConnected(int client)
     clients[client].deaths = 0;
     clients[client].chats = 0;
     clients[client].voiceTime = 0.0f;
+    clients[client].name.assign(info.name);
+    clients[client].nametime = curTick;
 
     json player_connect = {
         {"event", "player_connect"},
@@ -181,6 +182,12 @@ void Logic::OnClientDisconnected(int client, const char* reason)
     chats += player["chats"].get<int>();
     player["chats"] = chats;
 
+    // name usage
+    unsigned int hadName = curTick - clients[client].nametime;
+    if (player["names"].contains(clients[client].name))
+        hadName += player["names"][clients[client].name].get<unsigned int>();
+    player["names"][clients[client].name] = hadName;
+
     json player_disconnect = {
         {"event", "player_disconnect"},
         {"tick", curTick},
@@ -200,9 +207,26 @@ void Logic::OnClientSettingsChanged(int client)
     const auto& info = context->players[client].info;
     auto& player = data["players"][info.guid];
 
-    // list of names
-    if (std::find(player["names"].begin(), player["names"].end(), info.name) == player["names"].end())
-        player["names"].push_back(info.name);
+    // name usage
+    if (clients[client].name != info.name)
+    {
+        unsigned int hadName = curTick - clients[client].nametime;
+        if (player["names"].contains(clients[client].name))
+            hadName += player["names"][clients[client].name].get<unsigned int>();
+        player["names"][clients[client].name] = hadName;
+
+        json player_changename = {
+            {"event", "player_changename"},
+            {"tick", curTick},
+            {"steamid", info.guid},
+            {"oldname", clients[client].name},
+            {"newname", info.name}
+        };
+        data["events"] += player_changename;
+
+        clients[client].name.assign(info.name);
+        clients[client].nametime = curTick;
+    }
 
     // list of spray hashes
     if (info.customFiles[0])
