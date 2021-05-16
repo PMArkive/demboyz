@@ -200,7 +200,10 @@ void SourceGameContext::UserInfoChanged(int tableIdx, int entryIdx)
     if (entry.data.size() != sizeof(player_info_t))
     {
         if(players[client].connected)
+        {
+            logic->OnClientDisconnected(client, "");
             userIdLookUp[players[client].info.userID] = 0xFF;
+        }
 
         memset(&players[client].info, 0, sizeof(player_info_t));
         players[client].connected = false;
