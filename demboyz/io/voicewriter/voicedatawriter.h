@@ -86,6 +86,7 @@ private:
 
     int32_t m_lastVoiceTick = 0;
     int32_t m_silenceTicks = 0;
+    int32_t m_silenceTicksStart = 0;
     const char* m_outputPath = nullptr;
 
     int16_t m_decodeBuffer[32768];

@@ -190,14 +190,15 @@ void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
         if(!m_isSilenced)
         {
             m_isSilenced = true;
-            m_silence.emplace_back(std::make_pair(m_curTick, 0));
+            m_silenceTicksStart = m_silenceTicks;
+            m_silence.emplace_back(std::make_pair(m_curTick - m_silenceTicks, 0));
         }
         m_silenceTicks += (m_curTick - m_lastTick);
     }
     else if(m_isSilenced)
     {
         m_isSilenced = false;
-        m_silence.back().second = m_curTick;
+        m_silence.back().second = m_silenceTicks - m_silenceTicksStart;
     }
 
     for(auto& state : m_playerVoiceStates)
