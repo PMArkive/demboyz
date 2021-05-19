@@ -393,7 +393,7 @@ void VoiceDataWriter::OnNetPacket(NetPacket& packet)
 
         if(state.lastVoiceDataTick == -1)
         {
-            std::string name = std::string(m_outputPath) + "/" + std::string(guid) + ".opus";
+            std::string name = std::string(m_outputPath) + "/" + std::string(guid) + ".demopus";
             state.fileWriter.Init(name.c_str(), state.sampleRate);
             state.fileWriter.PadSilence((((uint64_t)m_curTick - m_silenceTicks) * 1000000UL) / (uint64_t)(context->fTickRate * 1000UL));
         }
