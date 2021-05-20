@@ -3,6 +3,16 @@
 #include <string.h>
 #include "opusfilewriter.h"
 
+/*
+uint8_t header[16] = 'DEMOPUSHEADER_V2'
+uint32_t sampleRate
+uint64_t samples
+
+while True:
+    uint64_t samplesOfs
+    uint32_t length
+    uint8_t data[length]
+*/
 
 int opus_stream_write(void *user_data, const unsigned char *ptr, opus_int32 len)
 {
@@ -29,6 +39,7 @@ OpusFileWriter::OpusFileWriter()
 OpusFileWriter::~OpusFileWriter()
 {
     assert(!m_Enc);
+    assert(!m_OutFile);
 }
 
 void OpusFileWriter::Init(const char* file, uint32_t sampleRate)
@@ -44,16 +55,16 @@ void OpusFileWriter::Init(const char* file, uint32_t sampleRate)
         return;
     }
 
-    uint8_t customHeader[16] = {'D', 'E', 'M', 'O', 'P', 'U', 'S', 'H', 'E', 'A', 'D', 'E', 'R', '_', 'V', '1'};
+    uint8_t customHeader[16] = {'D', 'E', 'M', 'O', 'P', 'U', 'S', 'H', 'E', 'A', 'D', 'E', 'R', '_', 'V', '2'};
     fwrite(customHeader, sizeof(customHeader), 1, m_OutFile);
 
-    uint8_t header = HEADER_TYPE_INFO;
-    fwrite(&header, sizeof(header), 1, m_OutFile);
     m_InfoStartPos = ftell(m_OutFile);
     fwrite(&m_SampleRate, sizeof(m_SampleRate), 1, m_OutFile);
     fwrite(&m_Samples, sizeof(m_Samples), 1, m_OutFile);
 
     m_Comments = ope_comments_create();
+
+    SwitchState(STATE_SILENCE);
 }
 
 void OpusFileWriter::Close()
@@ -61,8 +72,7 @@ void OpusFileWriter::Close()
     if(!m_OutFile)
         return;
 
-    SwitchState(HEADER_TYPE_INFO);
-    SwitchState(HEADER_TYPE_DONE);
+    SwitchState(STATE_DONE);
 
     ope_comments_destroy(m_Comments);
     m_Enc = nullptr;
@@ -79,29 +89,27 @@ void OpusFileWriter::SwitchState(int newState)
     if(m_State == newState)
         return;
 
-    if(m_State == HEADER_TYPE_SILENCE)
+    if(m_State == STATE_SILENCE)
     {
-        fwrite(&m_SilenceSamples, sizeof(m_SilenceSamples), 1, m_OutFile);
+        fwrite(&m_Samples, sizeof(m_Samples), 1, m_OutFile);
     }
-    else if(m_State == HEADER_TYPE_OPUS)
+    else if(m_State == STATE_OPUS)
     {
         ope_encoder_drain(m_Enc);
         ope_encoder_destroy(m_Enc);
         m_Enc = nullptr;
 
-        m_DataEndPos = ftell(m_OutFile);
+        long int dataEndPos = ftell(m_OutFile);
         fseek(m_OutFile, m_LengthStartPos, SEEK_SET);
-        uint64_t dataLen = m_DataEndPos - (m_LengthStartPos + sizeof(uint64_t));
+        uint32_t dataLen = dataEndPos - (m_LengthStartPos + sizeof(uint32_t));
         fwrite(&dataLen, sizeof(dataLen), 1, m_OutFile);
-        fseek(m_OutFile, m_DataEndPos, SEEK_SET);
+        fseek(m_OutFile, dataEndPos, SEEK_SET);
     }
 
-    if(newState == HEADER_TYPE_OPUS)
+    if(newState == STATE_OPUS)
     {
-        uint8_t header = HEADER_TYPE_OPUS;
-        fwrite(&header, sizeof(header), 1, m_OutFile);
         m_LengthStartPos = ftell(m_OutFile);
-        uint64_t dataLen = 0;
+        uint32_t dataLen = 0;
         fwrite(&dataLen, sizeof(dataLen), 1, m_OutFile);
 
         int error;
@@ -109,26 +117,16 @@ void OpusFileWriter::SwitchState(int newState)
             m_Enc = ope_encoder_create_callbacks(&opus_callbacks, (void *)this, m_Comments, m_SampleRate, 1, 0, &error);
         assert(error == 0);
     }
-    else if(newState == HEADER_TYPE_SILENCE)
+    else if(newState == STATE_SILENCE)
     {
-        m_SilenceStart = m_Samples;
-        m_SilenceSamples = 0;
-
-        uint8_t header = HEADER_TYPE_SILENCE;
-        fwrite(&header, sizeof(header), 1, m_OutFile);
     }
-    else if(newState == HEADER_TYPE_INFO)
+    else if(newState == STATE_DONE)
     {
         long int backup = ftell(m_OutFile);
         fseek(m_OutFile, m_InfoStartPos, SEEK_SET);
         fwrite(&m_SampleRate, sizeof(m_SampleRate), 1, m_OutFile);
         fwrite(&m_Samples, sizeof(m_Samples), 1, m_OutFile);
         fseek(m_OutFile, backup, SEEK_SET);
-    }
-    else if(newState == HEADER_TYPE_DONE)
-    {
-        uint8_t header = HEADER_TYPE_DONE;
-        fwrite(&header, sizeof(header), 1, m_OutFile);
     }
 
     m_State = newState;
@@ -150,7 +148,7 @@ void OpusFileWriter::WriteSamples(const int16_t* samples, uint32_t numSamples)
     if(!m_OutFile)
         return;
 
-    SwitchState(HEADER_TYPE_OPUS);
+    SwitchState(STATE_OPUS);
 
     ope_encoder_write(m_Enc, samples, numSamples);
     m_Samples += numSamples;
@@ -162,8 +160,7 @@ void OpusFileWriter::PadSilence(uint64_t milliseconds)
     if(!m_OutFile || m_Samples >= numSamples)
         return;
 
-    SwitchState(HEADER_TYPE_SILENCE);
+    SwitchState(STATE_SILENCE);
 
     m_Samples = numSamples;
-    m_SilenceSamples = m_Samples - m_SilenceStart;
 }

@@ -7,11 +7,9 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 enum {
-    HEADER_TYPE_NONE = 0,
-    HEADER_TYPE_INFO = 0x01,
-    HEADER_TYPE_OPUS = 0x02,
-    HEADER_TYPE_SILENCE = 0x03,
-    HEADER_TYPE_DONE = 0x04
+    STATE_DONE = 0,
+    STATE_SILENCE = 1,
+    STATE_OPUS = 2
 };
 
 class OpusFileWriter
@@ -30,13 +28,10 @@ public:
     int opus_stream_close();
 private:
     FILE *m_OutFile = nullptr;
-    int m_State = HEADER_TYPE_NONE;
+    int m_State = STATE_DONE;
     long int m_InfoStartPos;
     long int m_LengthStartPos;
-    long int m_DataEndPos;
-
-    uint64_t m_SilenceStart = 0;
-    uint64_t m_SilenceSamples = 0;
+    long int m_SilenceStartPos;
 
     OggOpusComments *m_Comments = nullptr;
     OggOpusEnc *m_Enc = nullptr;
