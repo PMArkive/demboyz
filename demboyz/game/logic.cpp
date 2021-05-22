@@ -58,7 +58,7 @@ void Logic::Finish(bool dirty)
     if (dirty)
     {
         data["demoheader"]["playback_ticks"] = curTick;
-        data["demoheader"]["playback_time"] = curTick * context->fTickRate;
+        data["demoheader"]["playback_time"] = curTick * context->fTickInterval;
         data["demoheader"]["playback_frames"] = context->curFrame;
     }
 
