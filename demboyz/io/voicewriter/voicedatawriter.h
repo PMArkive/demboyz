@@ -54,9 +54,11 @@ class VoiceDataWriter
 {
 public:
     VoiceDataWriter(SourceGameContext *context, const char* outputPath);
+    bool init();
 
     void Start();
     void Finish();
+    void End();
 
     void StartCommandPacket(const CommandPacket& packet);
     void EndCommandPacket(const PacketTrailingBits& trailingBits);
@@ -95,6 +97,7 @@ private:
     eCodec m_Codec = CODEC_NONE;
 
 public:
+    int32_t m_tickBase = 0;
     bool m_isSilenced = false;
     std::vector<std::pair<int32_t, int32_t>> m_silence;
 };

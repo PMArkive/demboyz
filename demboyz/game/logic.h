@@ -18,6 +18,7 @@ struct Logic
 
     void Start();
     void Finish(bool dirty);
+    void End();
 
     struct
     {
@@ -41,6 +42,7 @@ struct Logic
     void OnRoundStart(int timelimit);
     void OnRoundEnd(const char *message, int reason, int winner);
 
+    int32_t tickBase = 0;
     int32_t curTick = 0;
     float voiceTotalTime = 0.0f;
     float voiceActiveTime = 0.0f;

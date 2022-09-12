@@ -75,6 +75,7 @@ struct SourceGameContext
 
     void Start();
     void Finish(bool dirty);
+    void End();
 
     void StartCommandPacket(const CommandPacket& packet);
     void EndCommandPacket(const PacketTrailingBits& trailingBits);

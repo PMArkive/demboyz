@@ -25,21 +25,31 @@ Logic::~Logic()
 
 void Logic::Start()
 {
-    data["demoheader"] = json({
-        {"demofilestamp", context->header.demofilestamp},
-        {"demoprotocol", context->header.demoprotocol},
-        {"networkprotocol", context->header.networkprotocol},
-        {"servername", context->header.servername},
-        {"clientname", context->header.clientname},
-        {"mapname", context->header.mapname},
-        {"gamedirectory", context->header.gamedirectory},
-        {"playback_time", context->header.playback_time},
-        {"playback_ticks", context->header.playback_ticks},
-        {"playback_frames", context->header.playback_frames},
-        {"signonlength", context->header.signonlength}
-    });
+    tickBase = curTick;
+    if(curTick)
+    {
+        data["demoheader"]["playback_time"] = data["demoheader"]["playback_time"].get<float>() + context->header.playback_time;
+        data["demoheader"]["playback_ticks"] = data["demoheader"]["playback_ticks"].get<int32_t>() + context->header.playback_ticks;
+        data["demoheader"]["playback_frames"] = data["demoheader"]["playback_frames"].get<int32_t>() + context->header.playback_frames;
+    }
+    else
+    {
+        data["demoheader"] = json({
+            {"demofilestamp", context->header.demofilestamp},
+            {"demoprotocol", context->header.demoprotocol},
+            {"networkprotocol", context->header.networkprotocol},
+            {"servername", context->header.servername},
+            {"clientname", context->header.clientname},
+            {"mapname", context->header.mapname},
+            {"gamedirectory", context->header.gamedirectory},
+            {"playback_time", context->header.playback_time},
+            {"playback_ticks", context->header.playback_ticks},
+            {"playback_frames", context->header.playback_frames},
+            {"signonlength", context->header.signonlength}
+        });
+    }
 
-    // std::cout << data.dump(2, ' ', false, json::error_handler_t::replace) << "\n";
+    // std::cout << data["demoheader"].dump(2, ' ', false, json::error_handler_t::replace) << "\n";
 }
 
 void Logic::Finish(bool dirty)
@@ -59,9 +69,12 @@ void Logic::Finish(bool dirty)
     {
         data["demoheader"]["playback_ticks"] = curTick;
         data["demoheader"]["playback_time"] = curTick * context->fTickInterval;
-        data["demoheader"]["playback_frames"] = context->curFrame;
+        data["demoheader"]["playback_frames"] = data["demoheader"]["playback_frames"].get<int32_t>() - context->header.playback_frames + context->curFrame;
     }
+}
 
+void Logic::End()
+{
     data["voice"]["total_time"] = voiceTotalTime;
     data["voice"]["active_time"] = voiceActiveTime;
 

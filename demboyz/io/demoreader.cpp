@@ -10,6 +10,9 @@
 #include "sourcesdk/bitbuf.h"
 #include <cstdint>
 
+static NetHandlers::NetDataStructArray s_netDataStructs;
+static DemHandlers::DemDataStructArray s_demDataStructs;
+
 PacketTrailingBits ParsePacket(uint8_t* packet, size_t length,
                                SourceGameContext& context,
                                const NetHandlers::NetDataStructArray& netDataStructs)
@@ -38,13 +41,20 @@ PacketTrailingBits ParsePacket(uint8_t* packet, size_t length,
     return trailingBits;
 }
 
+void DemoReader::Init()
+{
+    NetHandlers::CreateNetMsgStructs(s_netDataStructs);
+    DemHandlers::CreateDemMsgStructs(s_demDataStructs);
+}
+
+void DemoReader::DeInit()
+{
+    DemHandlers::DestroyDemMsgStructs(s_demDataStructs);
+    NetHandlers::DestroyNetMsgStructs(s_netDataStructs);
+}
+
 bool DemoReader::ProcessDem(std::FILE* inputFp, SourceGameContext* context)
 {
-    NetHandlers::NetDataStructArray netDataStructs;
-    DemHandlers::DemDataStructArray demDataStructs;
-    NetHandlers::CreateNetMsgStructs(netDataStructs);
-    DemHandlers::CreateDemMsgStructs(demDataStructs);
-
     DemoFileReader reader(inputFp);
     {
         reader.ReadDemoHeader(context->header);
@@ -59,7 +69,7 @@ bool DemoReader::ProcessDem(std::FILE* inputFp, SourceGameContext* context)
         do
         {
             reader.ReadCmdHeader(packet.cmd, packet.tick);
-            packet.data = demDataStructs[packet.cmd];
+            packet.data = s_demDataStructs[packet.cmd];
             DemHandlers::DemMsg_FileRead(packet.cmd, reader, packet.data);
 
             PacketTrailingBits trailingBits = PacketTrailingBits();
@@ -68,7 +78,7 @@ bool DemoReader::ProcessDem(std::FILE* inputFp, SourceGameContext* context)
             if (packet.cmd == dem_packet || packet.cmd == dem_signon)
             {
                 Array<uint8_t> buffer = reader.ReadRawData(NET_MAX_PAYLOAD);
-                trailingBits = ParsePacket(buffer.begin(), buffer.length(), *context, netDataStructs);
+                trailingBits = ParsePacket(buffer.begin(), buffer.length(), *context, s_netDataStructs);
             }
 
             else if (packet.cmd == dem_stringtables)
@@ -100,8 +110,5 @@ bool DemoReader::ProcessDem(std::FILE* inputFp, SourceGameContext* context)
 
     context->Finish(dirty);
 
-    DemHandlers::DestroyDemMsgStructs(demDataStructs);
-    NetHandlers::DestroyNetMsgStructs(netDataStructs);
-
-    return !dirty;
+    return dirty;
 }

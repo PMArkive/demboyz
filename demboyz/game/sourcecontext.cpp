@@ -52,6 +52,9 @@ bool SourceGameContext::init()
     }
 
     voiceWriter = new VoiceDataWriter(this, outputDirVoice.c_str());
+    if(!voiceWriter->init())
+        return false;
+
     logic = new Logic(this);
     return true;
 }
@@ -64,8 +67,20 @@ void SourceGameContext::Start()
 
 void SourceGameContext::Finish(bool dirty)
 {
-    voiceWriter->Finish();
     logic->Finish(dirty);
+    voiceWriter->Finish();
+
+    for(int i = 0; i < MAX_PLAYERS; i++)
+        players[i].connected = false;
+
+    curTick = -1;
+    curFrame = -1;
+}
+
+void SourceGameContext::End()
+{
+    logic->End();
+    voiceWriter->End();
 }
 
 void SourceGameContext::StartCommandPacket(const CommandPacket& packet)
@@ -76,7 +91,7 @@ void SourceGameContext::StartCommandPacket(const CommandPacket& packet)
         return;
 
     curTick = packet.tick;
-    logic->curTick = curTick;
+    logic->curTick = logic->tickBase + curTick;
 
     voiceWriter->StartCommandPacket(packet);
 }

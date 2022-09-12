@@ -138,16 +138,26 @@ VoiceDataWriter::VoiceDataWriter(SourceGameContext* context, const char* outputP
 {
 }
 
-void VoiceDataWriter::Start()
+bool VoiceDataWriter::init()
 {
     int error = CELT_OK;
     const CeltConfig& config = sCeltConfigs[sQuality];
     m_celtMode = celt_mode_create(config.sampleRate, config.frameSizeSamples, &error);
     assert(error == CELT_OK);
     assert(m_celtMode);
+    return error == CELT_OK;
+}
+
+void VoiceDataWriter::Start()
+{
+    m_tickBase = m_curTick;
 }
 
 void VoiceDataWriter::Finish()
+{
+}
+
+void VoiceDataWriter::End()
 {
     if(m_isSilenced)
     {
@@ -175,7 +185,7 @@ void VoiceDataWriter::Finish()
 void VoiceDataWriter::StartCommandPacket(const CommandPacket& packet)
 {
     m_lastTick = m_curTick;
-    m_curTick = packet.tick;
+    m_curTick = m_tickBase + packet.tick;
 }
 
 void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
@@ -184,8 +194,8 @@ void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
     if (m_curTick <= tickMargin)
         return;
 
-    // Skip silence if noone talks for at least 3 seconds
-    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 3.0)
+    // Skip silence if noone talks for at least 1.5 seconds
+    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 1.5)
     {
         if(!m_isSilenced)
         {
