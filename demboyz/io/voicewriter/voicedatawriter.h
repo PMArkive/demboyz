@@ -53,7 +53,7 @@ private:
 class VoiceDataWriter
 {
 public:
-    VoiceDataWriter(SourceGameContext *context, const char* outputPath);
+    VoiceDataWriter(SourceGameContext *context, const char* outputPath, bool bSkipSilence);
     bool init();
 
     void Start();
@@ -90,6 +90,7 @@ private:
     int32_t m_silenceTicks = 0;
     int32_t m_silenceTicksStart = 0;
     const char* m_outputPath = nullptr;
+    bool m_bSkipSilence = true;
 
     int16_t m_decodeBuffer[32768];
 

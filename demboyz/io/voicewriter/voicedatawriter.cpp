@@ -132,9 +132,10 @@ int SilkVoiceDecoder::Decompress(
 }
 
 
-VoiceDataWriter::VoiceDataWriter(SourceGameContext* context, const char* outputPath):
+VoiceDataWriter::VoiceDataWriter(SourceGameContext* context, const char* outputPath, bool bSkipSilence):
     context(context),
-    m_outputPath(outputPath)
+    m_outputPath(outputPath),
+    m_bSkipSilence(bSkipSilence)
 {
 }
 
@@ -195,7 +196,7 @@ void VoiceDataWriter::EndCommandPacket(const PacketTrailingBits& trailingBits)
         return;
 
     // Skip silence if noone talks for at least 1.5 seconds
-    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 1.5)
+    if((m_curTick - m_lastVoiceTick) / context->fTickRate > 1.5 && m_bSkipSilence)
     {
         if(!m_isSilenced)
         {

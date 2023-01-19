@@ -78,6 +78,7 @@ void Logic::End()
     data["voice"]["total_time"] = voiceTotalTime;
     data["voice"]["active_time"] = voiceActiveTime;
 
+    data["voice"]["silence"] = json::array();
     for(const auto& o : context->voiceWriter->m_silence)
     {
         data["voice"]["silence"] += json({o.first, o.second});

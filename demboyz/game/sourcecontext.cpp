@@ -15,9 +15,10 @@
 #include "netmessages/svc_voiceinit.h"
 #include "netmessages/svc_voicedata.h"
 
-SourceGameContext::SourceGameContext(std::string outputDir, std::string outputDirVoice):
+SourceGameContext::SourceGameContext(std::string outputDir, std::string outputDirVoice, bool bSkipSilence):
     outputDir(outputDir),
-    outputDirVoice(outputDirVoice)
+    outputDirVoice(outputDirVoice),
+    m_bSkipSilence(bSkipSilence)
 {
     stringTables = new StringTableContainer(this);
     userIdLookUp = new uint8_t[USHRT_MAX+1];
@@ -51,7 +52,7 @@ bool SourceGameContext::init()
         return false;
     }
 
-    voiceWriter = new VoiceDataWriter(this, outputDirVoice.c_str());
+    voiceWriter = new VoiceDataWriter(this, outputDirVoice.c_str(), m_bSkipSilence);
     if(!voiceWriter->init())
         return false;
 

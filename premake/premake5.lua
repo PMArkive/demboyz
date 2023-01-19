@@ -1,25 +1,26 @@
-
 solution "demboyz"
     basedir ".."
     location (_ACTION)
     targetdir "../bin"
     startproject "demboyz"
     configurations { "Release", "Debug" }
-    flags { "MultiProcessorCompile", "Symbols" }
+    flags { "MultiProcessorCompile" }
+    symbols "On"
 
-    configuration "Debug"
+    filter "configurations:Debug"
         defines { "DEBUG" }
-    configuration "Release"
+    filter "configurations:Release"
         optimize "Full"
-    configuration {}
+    filter {}
 
     project "demboyz"
         kind "ConsoleApp"
         language "C++"
-        configuration "gmake"
+        filter "configurations:gmake"
             buildoptions { "-std=c++17 -Wall" }
             linkoptions { "-flto -no-pie -Wall" }
-        configuration {}
+        filter {}
+
         files
         {
             "../demboyz/**.h",

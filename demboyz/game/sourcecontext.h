@@ -69,7 +69,7 @@ typedef struct player_info_s
 
 struct SourceGameContext
 {
-    SourceGameContext(std::string outputDir, std::string outputDirVoice);
+    SourceGameContext(std::string outputDir, std::string outputDirVoice, bool bSkipSilence);
     ~SourceGameContext();
     bool init();
 
@@ -88,6 +88,7 @@ struct SourceGameContext
 
     std::string outputDir;
 	std::string outputDirVoice;
+	bool m_bSkipSilence;
 
     FILE* outputFp;
 	Logic* logic;

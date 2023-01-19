@@ -7,9 +7,10 @@ group "external"
         kind "StaticLib"
         language "C++"
         location (_ACTION .. "/" .. project().name)
-        configuration "gmake"
+        filter "configurations:gmake"
             buildoptions { "-std=c++11" }
-        configuration {}
+        filter {}
+
         includedirs
         {
             base_dir .. "include/",
